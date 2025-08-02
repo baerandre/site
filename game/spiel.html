@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spiel</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <h2>Willkommen, <span id="name"></span>!</h2>
+  <p>Hier könnte dein Spiel stehen!</p>
+
+  <script>
+    const name = localStorage.getItem("spielername");
+    if (!name) {
+      alert("Zugriff verweigert!");
+      window.location.href = "index.html";
+    } else {
+      document.getElementById("name").textContent = name;
+    }
+  </script>
+</body>
+</html>
