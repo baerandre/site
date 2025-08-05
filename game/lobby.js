@@ -10,6 +10,7 @@ let userId = localStorage.getItem("userId") || null;
 let userName = "";
 let istHost = false;
 
+// 🔁 BEITRETEN
 async function beitreten() {
   const nameInput = document.getElementById("nameInput");
   const name = nameInput.value.trim();
@@ -40,17 +41,22 @@ async function beitreten() {
   liveSpielerAnzeigen();
 }
 
+// 🔁 PRÜFEN, OB HOST
 async function checkObHost() {
-  const snapshot = await getDoc(doc(db, "spiele", SPIEL_ID));
+  const spielDoc = doc(db, "spiele", SPIEL_ID);
+  const snapshot = await getDoc(spielDoc);
+
   if (!snapshot.exists()) {
-    await setDoc(doc(db, "spiele", SPIEL_ID), {
+    await setDoc(spielDoc, {
       erstelltAm: serverTimestamp()
     });
     return true;
   }
+
   return false;
 }
 
+// 🔁 LOBBY LIVE AKTUALISIEREN
 function liveSpielerAnzeigen() {
   const spielerListe = document.getElementById("spielerListe");
   const spielerRef = collection(db, "spiele", SPIEL_ID, "spieler");
@@ -67,58 +73,38 @@ function liveSpielerAnzeigen() {
   });
 }
 
-// ✅ SPIEL STARTEN (Host)
+// ✅ SPIEL STARTEN
 async function spielStarten() {
   const kategorieInput = document.getElementById("kategorieInput");
   const kategorie = kategorieInput.value.trim();
   if (!kategorie) return alert("Bitte gib eine Kategorie ein.");
 
-  // 1. Spieler holen
-  const spielerSnapshot = await getDocs(collection(db, "spiele", SPIEL_ID, "spieler"));
-  const ids = [];
-  spielerSnapshot.forEach(doc => ids.push(doc.id));
-
-  // 2. Impostor wählen
-  const impostorId = ids[Math.floor(Math.random() * ids.length)];
-
-  // 3. Rollen speichern
-  for (const id of ids) {
-    const rolle = id === impostorId ? "impostor" : "innocent";
-    await updateDoc(doc(db, "spiele", SPIEL_ID, "spieler", id), { rolle });
-  }
-
-  // 4. Begriffe laden (nur Innocents)
-  const begriffeSnap = await getDocs(collection(db, "spiele", SPIEL_ID, "begriffe"));
-  const möglicheWorte = [];
-  begriffeSnap.forEach(doc => {
-    if (doc.id !== impostorId) {
-      möglicheWorte.push(doc.data().wort);
-    }
-  });
-
-  // 5. Wort wählen
-  const wort = möglicheWorte[Math.floor(Math.random() * möglicheWorte.length)];
-
-  // 6. Spielzustand speichern
-  await updateDoc(doc(db, "spiele", SPIEL_ID), {
+  const spielDoc = doc(db, "spiele", SPIEL_ID);
+  await updateDoc(spielDoc, {
     kategorie: kategorie,
-    phase: "hinweisrunde",
-    impostor: impostorId,
-    wort: wort
+    phase: "begriff_sammeln"
   });
 
-  alert("Spiel wurde gestartet!");
-  // Optional: Weiterleitung z. B. window.location.href = "spiel.html";
+  alert("Kategorie gesetzt. Spieler können nun Begriffe schreiben.");
 }
 
 // ✅ LOBBY VERLASSEN
 async function lobbyVerlassen() {
-  if (!userId) return;
-  await deleteDoc(doc(db, "spiele", SPIEL_ID, "spieler", userId));
-  await deleteDoc(doc(db, "spiele", SPIEL_ID, "begriffe", userId));
-  localStorage.removeItem("userId");
-  alert("Du hast die Lobby verlassen.");
-  location.reload(); // oder window.location.href = "index.html";
+  if (!userId) {
+    alert("Keine gültige Benutzer-ID gefunden.");
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, "spiele", SPIEL_ID, "spieler", userId));
+    await deleteDoc(doc(db, "spiele", SPIEL_ID, "begriffe", userId));
+    localStorage.removeItem("userId");
+    alert("Du hast die Lobby verlassen.");
+    window.location.reload();
+  } catch (err) {
+    console.error("Fehler beim Verlassen der Lobby:", err);
+    alert("Fehler beim Verlassen. Bitte versuche es erneut.");
+  }
 }
 
 window.beitreten = beitreten;
