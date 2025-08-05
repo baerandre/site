@@ -1,31 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Spiel-Zugang</title>
-  <link rel="stylesheet" href="../style.css">
-</head>
-<body>
-  <h2>Passwort eingeben</h2>
-  <input type="password" id="pw" placeholder="Passwort">
-  <button onclick="checkPassword()">Weiter</button>
 
-  <script>
-    function checkPassword() {
-      const pw = document.getElementById("pw").value;
-      if (pw === "geheim") {
-        const username = prompt("Spielername:");
-        if (username) {
-          localStorage.setItem("spielername", username);
-          window.location.href = "spiel.html";
-        }
-      } else  {
-        alert("Falsches Passwort!");
-      }
-    }
-  </script>
-</body>
-</html>
 
 
 
