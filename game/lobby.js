@@ -39,6 +39,8 @@ async function beitreten() {
   }
 
   liveSpielerAnzeigen();
+  ladeKategorieLive();
+
 }
 
 // 🔁 PRÜFEN, OB HOST
