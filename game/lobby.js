@@ -40,6 +40,7 @@ async function beitreten() {
 
   liveSpielerAnzeigen();
   ladeKategorieLive();
+  ladeHostLive();
 
 }
 
