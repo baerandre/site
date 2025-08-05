@@ -5,37 +5,62 @@
   <title>Geheimes Wort – Lobby</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    input, button { padding: 10px; margin: 5px 0; width: 100%; }
-    #spielerListe { margin-top: 20px; }
-    .spieler { padding: 5px; border-bottom: 1px solid #ccc; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #spielerListe {
+      margin-top: 20px;
+    }
+    .spieler {
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+    #hostControls {
+      background-color: #f3f3f3;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
+
   <h1>🕹️ Geheimes Wort – Lobby</h1>
 
+  <!-- Bereich: Spieler beitreten -->
   <div id="joinArea">
     <input type="text" id="nameInput" placeholder="Dein Name">
     <button onclick="beitreten()">Beitreten</button>
   </div>
 
+  <!-- Bereich: Lobby nach dem Beitritt -->
   <div id="lobbyArea" style="display: none;">
     <p><strong>Du bist eingeloggt als:</strong> <span id="spielerName"></span></p>
 
+    <!-- HOST CONTROLS: Nur sichtbar für Host -->
     <div id="hostControls" style="display: none;">
-      <input type="text" id="kategorieInput" placeholder="Kategorie (z. B. Tier, Film...)">
-      <button onclick="spielStarten()">Spiel starten</button>
+      <h3>Host-Steuerung</h3>
+      <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
+      <button onclick="spielStarten()">Kategorie setzen / Spiel starten</button>
     </div>
 
     <h3>Spieler in der Lobby:</h3>
     <div id="spielerListe"></div>
-    <button onclick="lobbyVerlassen()">Lobby verlassen</button>
 
+    <button onclick="lobbyVerlassen()">Lobby verlassen</button>
   </div>
 
-  <!-- Firebase & eigene Scripts -->
+  <!-- Firebase & Spiel-Logik -->
   <script type="module" src="./firebase.js"></script>
   <script type="module" src="./lobby.js"></script>
 </body>
 </html>
-
