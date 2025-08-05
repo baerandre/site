@@ -1,22 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Spiel</title>
-  <link rel="stylesheet" href="../style.css">
+  <title>Geheimes Wort – Lobby</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; }
+    #spielerListe { margin-top: 20px; }
+    .spieler { padding: 5px; border-bottom: 1px solid #ccc; }
+  </style>
 </head>
 <body>
-  <h2>Willkommen, <span id="name"></span>!</h2>
-  <p>Hier könnte dein Spiel stehen!</p>
+  <h1>🕹️ Geheimes Wort – Lobby</h1>
 
-  <script>
-    const name = localStorage.getItem("spielername");
-    if (!name) {
-      alert("Zugriff verweigert!");
-      window.location.href = "index.html";
-    } else {
-      document.getElementById("name").textContent = name;
-    }
-  </script>
+  <div id="joinArea">
+    <input type="text" id="nameInput" placeholder="Dein Name">
+    <button onclick="beitreten()">Beitreten</button>
+  </div>
+
+  <div id="lobbyArea" style="display: none;">
+    <p><strong>Du bist eingeloggt als:</strong> <span id="spielerName"></span></p>
+
+    <div id="hostControls" style="display: none;">
+      <input type="text" id="kategorieInput" placeholder="Kategorie (z. B. Tier, Film...)">
+      <button onclick="spielStarten()">Spiel starten</button>
+    </div>
+
+    <h3>Spieler in der Lobby:</h3>
+    <div id="spielerListe"></div>
+  </div>
+
+  <!-- Firebase & eigene Scripts -->
+  <script type="module" src="./firebase.js"></script>
+  <script type="module" src="./lobby.js"></script>
 </body>
 </html>
