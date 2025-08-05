@@ -45,17 +45,29 @@ async function beitreten() {
 
 // 🔁 PRÜFEN, OB HOST
 async function checkObHost() {
-  const spielDoc = doc(db, "spiele", SPIEL_ID);
-  const snapshot = await getDoc(spielDoc);
+  const spielDocRef = doc(db, "spiele", SPIEL_ID);
+  const spielDoc = await getDoc(spielDocRef);
 
-  if (!snapshot.exists()) {
-    await setDoc(spielDoc, {
-      erstelltAm: serverTimestamp()
-    });
+  // Falls Spiel-Dokument fehlt, ist das der erste Spieler → Host
+  if (!spielDoc.exists()) {
+    await setDoc(spielDocRef, { erstelltAm: serverTimestamp() });
     return true;
   }
 
-  return false;
+  // Host vorhanden? → prüfen, ob aktiv
+  const spielerSnap = await getDocs(collection(db, "spiele", SPIEL_ID, "spieler"));
+  const alleSpieler = [];
+  spielerSnap.forEach(doc => alleSpieler.push(doc.id));
+
+  // Wurde bereits ein Host markiert?
+  const currentData = spielDoc.data();
+  if (!currentData.host || !alleSpieler.includes(currentData.host)) {
+    // Host fehlt oder ist weg → neuen Host setzen (erster in Liste)
+    const neuerHost = alleSpieler[0];
+    await updateDoc(spielDocRef, { host: neuerHost });
+  }
+
+  return currentData.host === userId;
 }
 
 // 🔁 LOBBY LIVE AKTUALISIEREN
