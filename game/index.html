@@ -13,12 +13,18 @@
   <script>
     function checkPassword() {
       const pw = document.getElementById("pw").value;
-      if (pw === "geheim")
-      } else {
+      if (pw === "geheim") {
+        const username = prompt("Spielername:");
+        if (username) {
+          localStorage.setItem("spielername", username);
+          window.location.href = "spiel.html";
+        }
+      } else  {
         alert("Falsches Passwort!");
       }
     }
   </script>
 </body>
 </html>
+
 
