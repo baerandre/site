@@ -70,6 +70,20 @@ async function checkObHost() {
   return currentData.host === userId;
 }
 
+function ladeHostLive() {
+  const spielRef = doc(db, "spiele", SPIEL_ID);
+  onSnapshot(spielRef, async (docSnap) => {
+    const data = docSnap.data();
+    if (data?.host) {
+      const hostNameDoc = await getDoc(doc(db, "spiele", SPIEL_ID, "spieler", data.host));
+      const hostName = hostNameDoc.exists() ? hostNameDoc.data().name : "unbekannt";
+      const el = document.getElementById("hostInfo");
+      if (el) el.textContent = `👑 Host: ${hostName}`;
+    }
+  });
+}
+
+
 // 🔁 LOBBY LIVE AKTUALISIEREN
 function liveSpielerAnzeigen() {
   const spielerListe = document.getElementById("spielerListe");
