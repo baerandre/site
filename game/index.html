@@ -13,12 +13,7 @@
   <script>
     function checkPassword() {
       const pw = document.getElementById("pw").value;
-      if (pw === "geheim") {
-        const username = prompt("Spielername:");
-        if (username) {
-          localStorage.setItem("spielername", username);
-          window.location.href = "spiel.html";
-        }
+      if (pw === "geheim")
       } else {
         alert("Falsches Passwort!");
       }
@@ -26,3 +21,4 @@
   </script>
 </body>
 </html>
+
