@@ -109,6 +109,21 @@ async function lobbyVerlassen() {
   }
 }
 
+function ladeKategorieLive() {
+  const spielRef = doc(db, "spiele", SPIEL_ID);
+
+  onSnapshot(spielRef, (docSnap) => {
+    const data = docSnap.data();
+    if (data?.kategorie) {
+      const kategorieAnzeigen = document.getElementById("kategorieAnzeige");
+      if (kategorieAnzeigen) {
+        kategorieAnzeigen.textContent = `📘 Kategorie: ${data.kategorie}`;
+      }
+    }
+  });
+}
+
+
 window.beitreten = beitreten;
 window.spielStarten = spielStarten;
 window.lobbyVerlassen = lobbyVerlassen;
