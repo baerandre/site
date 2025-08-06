@@ -41,8 +41,21 @@ async function beitreten() {
   liveSpielerAnzeigen();
   ladeKategorieLive();
   ladeHostLive();
+  beobachtePhaseUndLeiteWeiter();
 
 }
+
+function beobachtePhaseUndLeiteWeiter() {
+  const spielRef = doc(db, "spiele", SPIEL_ID);
+  onSnapshot(spielRef, (docSnap) => {
+    const data = docSnap.data();
+    if (data?.phase === "begriff_sammeln") {
+      // Weiterleitung für alle Spieler, sobald das Spiel beginnt
+      window.location.href = "spiel.html";
+    }
+  });
+}
+
 
 // 🔁 PRÜFEN, OB HOST
 async function checkObHost() {
