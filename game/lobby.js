@@ -49,9 +49,13 @@ function beobachtePhaseUndLeiteWeiter() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
   onSnapshot(spielRef, (docSnap) => {
     const data = docSnap.data();
-    if (data?.phase === "begriff_sammeln") {
-      // Weiterleitung für alle Spieler, sobald das Spiel beginnt
-      window.location.href = "spiel.html";
+
+    if (data?.phase === "begriff_sammeln" && data?.kategorie) {
+      // Weiterleitung nur, wenn Kategorie gesetzt UND Spielphase stimmt
+      // und der Spieler nicht der Host ist (optional)
+      if (!istHost) {
+        window.location.href = "spiel.html";
+      }
     }
   });
 }
