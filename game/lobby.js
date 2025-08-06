@@ -108,14 +108,16 @@ async function spielStarten() {
   const kategorie = kategorieInput.value.trim();
   if (!kategorie) return alert("Bitte gib eine Kategorie ein.");
 
-  const spielDoc = doc(db, "spiele", SPIEL_ID);
-  await updateDoc(spielDoc, {
+  // Setze Kategorie und Spielphase
+  await updateDoc(doc(db, "spiele", SPIEL_ID), {
     kategorie: kategorie,
     phase: "begriff_sammeln"
   });
 
-  alert("Kategorie gesetzt. Spieler können nun Begriffe schreiben.");
+  // Weiterleitung nach Spielstart
+  window.location.href = "spiel.html";
 }
+
 
 // ✅ LOBBY VERLASSEN
 async function lobbyVerlassen() {
