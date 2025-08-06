@@ -47,13 +47,18 @@ async function beitreten() {
 
 function beobachtePhaseUndLeiteWeiter() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
+  let warSchonInPhase = false;
+
   onSnapshot(spielRef, (docSnap) => {
     const data = docSnap.data();
+    const phase = data?.phase;
 
-    if (data?.phase === "begriff_sammeln" && data?.kategorie) {
-      // Weiterleitung nur, wenn Kategorie gesetzt UND Spielphase stimmt
-      // und der Spieler nicht der Host ist (optional)
+    // Sobald Spielphase auf "begriff_sammeln" geht – aber nur beim Übergang
+    if (phase === "begriff_sammeln" && !warSchonInPhase) {
+      warSchonInPhase = true;
+
       if (!istHost) {
+        console.log("→ Spiel startet – Weiterleitung zu spiel.html");
         window.location.href = "spiel.html";
       }
     }
