@@ -42,29 +42,31 @@
     <button onclick="beitreten()">Beitreten</button>
   </div>
 
-  <!-- Bereich: Lobby nach dem Beitritt -->
   <div id="lobbyArea" style="display: none;">
-    <p><strong>Du bist eingeloggt als:</strong> <span id="spielerName"></span></p>
-    <p id="hostInfo"></p>
+  <p><strong>Du bist eingeloggt als:</strong> <span id="spielerName"></span></p>
+  <p id="hostInfo"></p>
 
-    <!-- HOST CONTROLS: Nur sichtbar für Host -->
-    <div id="hostControls" style="display: none;">
-      <h3>Host-Steuerung</h3>
-      <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
-      <p id="kategorieAnzeige" style="font-weight: bold;"></p>
-      <button onclick="spielStarten()">Kategorie setzen / Spiel starten</button>
-    </div>
+  <!-- ✅ Kategorie für alle sichtbar -->
+  <p id="kategorieAnzeige" style="font-weight: bold; font-size: 18px; color: #333;"></p>
 
-    <h3>Spieler in der Lobby:</h3>
-    <div id="spielerListe"></div>
-
-    <button onclick="lobbyVerlassen()">Lobby verlassen</button>
+  <!-- HOST CONTROLS -->
+  <div id="hostControls" style="display: none;">
+    <h3>Host-Steuerung</h3>
+    <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
+    <button onclick="spielStarten()">Kategorie setzen / Spiel starten</button>
   </div>
+
+  <h3>Spieler in der Lobby:</h3>
+  <div id="spielerListe"></div>
+
+  <button onclick="lobbyVerlassen()">Lobby verlassen</button>
+</div>
 
   <!-- Firebase & Spiel-Logik -->
   <script type="module" src="./firebase.js"></script>
   <script type="module" src="./lobby.js"></script>
 </body>
 </html>
+
 
 
