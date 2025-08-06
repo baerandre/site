@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Geheimes Wort – Begriff eingeben</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📝 Begriff zur Kategorie eingeben</h1>
+
+  <p><strong>Kategorie:</strong> <span id="kategorieText">Lade...</span></p>
+
+  <input type="text" id="begriffInput" placeholder="Dein geheimer Begriff">
+  <button onclick="begriffEinreichen()">Begriff einreichen</button>
+
+  <div id="status"></div>
+
+  <!-- Firebase & Spiel-Logik -->
+  <script type="module" src="./firebase.js"></script>
+  <script type="module">
+    import {
+      getDoc, doc, setDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { db } from "./firebase.js";
+
+    const SPIEL_ID = "hauptspiel";
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      alert("Keine Benutzer-ID gefunden. Bitte gehe zurück zur Lobby.");
+      window.location.href = "index.html";
+    }
+
+    // Kategorie auslesen
+    async function ladeKategorie() {
+      const spielDoc = await getDoc(doc(db, "spiele", SPIEL_ID));
+      const data = spielDoc.data();
+      if (data?.kategorie) {
+        document.getElementById("kategorieText").textContent = data.kategorie;
+      } else {
+        document.getElementById("kategorieText").textContent = "Keine Kategorie gesetzt.";
+      }
+    }
+
+    // Begriff speichern
+    async function begriffEinreichen() {
+      const input = document.getElementById("begriffInput");
+      const wort = input.value.trim();
+
+      if (!wort) {
+        alert("Bitte gib einen Begriff ein.");
+        return;
+      }
+
+      await setDoc(doc(db, "spiele", SPIEL_ID, "begriffe", userId), {
+        wort: wort
+      });
+
+      input.disabled = true;
+      document.querySelector("button").disabled = true;
+      document.getElementById("status").textContent = "✅ Dein Begriff wurde gespeichert.";
+    }
+
+    ladeKategorie();
+  </script>
+</body>
+</html>
