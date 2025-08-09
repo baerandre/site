@@ -34,6 +34,18 @@
 
   <div id="status"></div>
 
+  <!-- Host-Steuerung -->
+<div id="hostControls" style="display: none;">
+  <h3>Host-Steuerung</h3>
+  <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
+  <button onclick="spielStarten()">Kategorie setzen / Begriffphase starten</button>
+
+  <!-- Neu: Rollenvergabe -->
+  <button onclick="rollenVergebenUndStarten()">Rollen vergeben & Wort ziehen</button>
+  <small>Nutze das erst, wenn alle ihren Begriff in <code>spiel.html</code> eingetragen haben.</small>
+</div>
+
+
   <!-- Firebase & Spiel-Logik -->
   <script type="module" src="./firebase.js"></script>
   <script type="module">
