@@ -51,7 +51,7 @@ function beobachtePhaseUndLeiteWeiter() {
 
   onSnapshot(spielRef, (docSnap) => {
     const data = docSnap.data();
-    const neuePhase = data?.phase;
+    const neuePhase = data?.phase || "wartend";
 
     // Nur reagieren, wenn Phase sich ändert
     if (aktuellePhase !== neuePhase && neuePhase === "begriff_sammeln") {
@@ -64,35 +64,40 @@ function beobachtePhaseUndLeiteWeiter() {
   });
 }
 
+
 // 🔁 PRÜFEN, OB HOST
 async function checkObHost() {
   const spielDocRef = doc(db, "spiele", SPIEL_ID);
   const spielDoc = await getDoc(spielDocRef);
 
-  // Falls Spiel-Dokument fehlt, ist das der erste Spieler → Host
+  // Falls Spiel-Dokument fehlt → neu anlegen
   if (!spielDoc.exists()) {
     await setDoc(spielDocRef, {
       erstelltAm: serverTimestamp(),
-      phase: "wartend" // neue Standardphase
+      phase: "wartend" // Standardphase setzen
     });
     return true;
   }
 
-  // Host vorhanden? → prüfen, ob aktiv
+  // Host-Überprüfung
   const spielerSnap = await getDocs(collection(db, "spiele", SPIEL_ID, "spieler"));
   const alleSpieler = [];
   spielerSnap.forEach(doc => alleSpieler.push(doc.id));
 
-  // Wurde bereits ein Host markiert?
   const currentData = spielDoc.data();
+
+  // Falls kein Host oder Host weg → neuen Host setzen
   if (!currentData.host || !alleSpieler.includes(currentData.host)) {
-    // Host fehlt oder ist weg → neuen Host setzen (erster in Liste)
     const neuerHost = alleSpieler[0];
-    await updateDoc(spielDocRef, { host: neuerHost });
+    await updateDoc(spielDocRef, {
+      host: neuerHost,
+      phase: "wartend" // Host-Wechsel = Lobby-Phase
+    });
   }
 
   return currentData.host === userId;
 }
+
 
 // 🔁 HOST ANZEIGEN
 function ladeHostLive() {
@@ -136,15 +141,15 @@ async function spielStarten() {
     return;
   }
 
-  // Setze Kategorie und Spielphase
   await updateDoc(doc(db, "spiele", SPIEL_ID), {
     kategorie: kategorie,
     phase: "begriff_sammeln"
   });
 
-  // Host wird sofort weitergeleitet
+  // Host sofort weiterleiten
   window.location.href = "spiel.html";
 }
+
 
 // ✅ LOBBY VERLASSEN
 async function lobbyVerlassen() {
