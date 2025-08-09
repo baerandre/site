@@ -51,22 +51,23 @@
 
   <!-- HOST CONTROLS -->
   <div id="hostControls" style="display: none;">
-    <h3>Host-Steuerung</h3>
-    <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
-    <button onclick="spielStarten()">Kategorie setzen / Spiel starten</button>
-  </div>
+  <h3>Host-Steuerung</h3>
+  <input type="text" id="kategorieInput" placeholder="Kategorie eingeben (z. B. Tiere)">
+  <button onclick="spielStarten()">Kategorie setzen / Begriffphase starten</button>
 
-  <h3>Spieler in der Lobby:</h3>
-  <div id="spielerListe"></div>
+  <button onclick="rollenVergebenUndStarten()">Rollen vergeben & Wort ziehen</button>
+  <button onclick="spielZuruecksetzen()">🔄 Spiel zurücksetzen</button>
 
-  <button onclick="lobbyVerlassen()">Lobby verlassen</button>
+  <small>Nutze „Rollen vergeben“, wenn alle ihre Begriffe in <code>spiel.html</code> eingetragen haben.</small>
 </div>
+
 
   <!-- Firebase & Spiel-Logik -->
   <script type="module" src="./firebase.js"></script>
   <script type="module" src="./lobby.js"></script>
 </body>
 </html>
+
 
 
 
