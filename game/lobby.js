@@ -57,6 +57,10 @@ function beobachtePhaseUndLeiteWeiter() {
       if (!istHost) window.location.href = "spiel.html";
     }
     aktuellePhase = neuePhase;
+    if (aktuellePhase !== neuePhase && neuePhase === "hinweisrunde") {
+  // alle (inkl. Host, falls noch hier) rüber zur Runde
+  window.location.href = "runde.html";
+  }
   });
 }
 
@@ -200,3 +204,62 @@ function ladeKategorieLive() {
 window.beitreten = beitreten;
 window.spielStarten = spielStarten;
 window.lobbyVerlassen = lobbyVerlassen;
+
+// ✅ ROLLEN VERGEBEN & WORT ZIEHEN (nur Host)
+import { query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"; // oben zu deinen Imports ergänzen
+
+async function rollenVergebenUndStarten() {
+  if (!istHost) {
+    alert("Nur der Host kann die Rollen vergeben.");
+    return;
+  }
+
+  // 1) Alle Spieler holen
+  const spielerCol = collection(db, "spiele", SPIEL_ID, "spieler");
+  const spielerSnap = await getDocs(spielerCol);
+  const spielerIds = [];
+  spielerSnap.forEach(d => spielerIds.push(d.id));
+
+  if (spielerIds.length < 3) {
+    alert("Mindestens 3 Spieler empfohlen, um zu starten.");
+    return;
+  }
+
+  // 2) Begriffe holen
+  const begriffeCol = collection(db, "spiele", SPIEL_ID, "begriffe");
+  const begriffeSnap = await getDocs(begriffeCol);
+  const begriffeMap = {}; // {userId: wort}
+  begriffeSnap.forEach(d => begriffeMap[d.id] = (d.data()?.wort || "").trim());
+
+  // Prüfen, ob jeder einen Begriff hat (oder zumindest 2)
+  const gueltigeEintraege = Object.keys(begriffeMap).filter(id => begriffeMap[id]);
+  if (gueltigeEintraege.length < Math.max(2, spielerIds.length - 1)) {
+    alert("Es sind noch nicht genug Begriffe eingereicht.");
+    return;
+  }
+
+  // 3) Impostor wählen
+  const impostorId = spielerIds[Math.floor(Math.random() * spielerIds.length)];
+
+  // 4) Rollen speichern
+  for (const id of spielerIds) {
+    const rolle = id === impostorId ? "impostor" : "innocent";
+    await updateDoc(doc(db, "spiele", SPIEL_ID, "spieler", id), { rolle });
+  }
+
+  // 5) Wort ziehen (nicht vom Impostor)
+  const kandidaten = gueltigeEintraege.filter(id => id !== impostorId);
+  const wort = begriffeMap[kandidaten[Math.floor(Math.random() * kandidaten.length)]];
+
+  // 6) Spiel-Dokument updaten → Start der Hinweisrunde
+  await updateDoc(doc(db, "spiele", SPIEL_ID), {
+    impostor: impostorId,
+    wort: wort,
+    phase: "hinweisrunde"
+  });
+
+  // Host direkt in die Runde schicken
+  window.location.href = "runde.html";
+}
+window.rollenVergebenUndStarten = rollenVergebenUndStarten;
+
