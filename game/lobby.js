@@ -42,29 +42,27 @@ async function beitreten() {
   ladeKategorieLive();
   ladeHostLive();
   beobachtePhaseUndLeiteWeiter();
-
 }
 
+// 🔁 PHASENÄNDERUNG BEOBACHTEN UND WEITERLEITEN
 function beobachtePhaseUndLeiteWeiter() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
-  let warSchonInPhase = false;
+  let aktuellePhase = null;
 
   onSnapshot(spielRef, (docSnap) => {
     const data = docSnap.data();
-    const phase = data?.phase;
+    const neuePhase = data?.phase;
 
-    // Sobald Spielphase auf "begriff_sammeln" geht – aber nur beim Übergang
-    if (phase === "begriff_sammeln" && !warSchonInPhase) {
-      warSchonInPhase = true;
-
+    // Nur reagieren, wenn Phase sich ändert
+    if (aktuellePhase !== neuePhase && neuePhase === "begriff_sammeln") {
       if (!istHost) {
         console.log("→ Spiel startet – Weiterleitung zu spiel.html");
         window.location.href = "spiel.html";
       }
     }
+    aktuellePhase = neuePhase;
   });
 }
-
 
 // 🔁 PRÜFEN, OB HOST
 async function checkObHost() {
@@ -73,7 +71,10 @@ async function checkObHost() {
 
   // Falls Spiel-Dokument fehlt, ist das der erste Spieler → Host
   if (!spielDoc.exists()) {
-    await setDoc(spielDocRef, { erstelltAm: serverTimestamp() });
+    await setDoc(spielDocRef, {
+      erstelltAm: serverTimestamp(),
+      phase: "wartend" // neue Standardphase
+    });
     return true;
   }
 
@@ -93,6 +94,7 @@ async function checkObHost() {
   return currentData.host === userId;
 }
 
+// 🔁 HOST ANZEIGEN
 function ladeHostLive() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
   onSnapshot(spielRef, async (docSnap) => {
@@ -105,7 +107,6 @@ function ladeHostLive() {
     }
   });
 }
-
 
 // 🔁 LOBBY LIVE AKTUALISIEREN
 function liveSpielerAnzeigen() {
@@ -130,16 +131,20 @@ async function spielStarten() {
   const kategorie = kategorieInput.value.trim();
   if (!kategorie) return alert("Bitte gib eine Kategorie ein.");
 
+  if (!istHost) {
+    alert("Nur der Host kann das Spiel starten.");
+    return;
+  }
+
   // Setze Kategorie und Spielphase
   await updateDoc(doc(db, "spiele", SPIEL_ID), {
     kategorie: kategorie,
     phase: "begriff_sammeln"
   });
 
-  // Weiterleitung nach Spielstart
+  // Host wird sofort weitergeleitet
   window.location.href = "spiel.html";
 }
-
 
 // ✅ LOBBY VERLASSEN
 async function lobbyVerlassen() {
@@ -160,6 +165,7 @@ async function lobbyVerlassen() {
   }
 }
 
+// 🔁 KATEGORIE LIVE LADEN
 function ladeKategorieLive() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
 
@@ -173,7 +179,6 @@ function ladeKategorieLive() {
     }
   });
 }
-
 
 window.beitreten = beitreten;
 window.spielStarten = spielStarten;
