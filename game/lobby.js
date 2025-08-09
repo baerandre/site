@@ -70,33 +70,38 @@ async function checkObHost() {
   const spielDocRef = doc(db, "spiele", SPIEL_ID);
   const spielDoc = await getDoc(spielDocRef);
 
-  // Falls Spiel-Dokument fehlt → neu anlegen
+  // 1) Erstes Spiel-Dokument anlegen → DIESER Spieler wird Host
   if (!spielDoc.exists()) {
     await setDoc(spielDocRef, {
       erstelltAm: serverTimestamp(),
-      phase: "wartend" // Standardphase setzen
+      phase: "wartend",
+      host: userId
     });
-    return true;
+    return true; // du bist Host
   }
 
-  // Host-Überprüfung
+  // 2) Prüfen, ob aktueller Host gültig ist
   const spielerSnap = await getDocs(collection(db, "spiele", SPIEL_ID, "spieler"));
   const alleSpieler = [];
-  spielerSnap.forEach(doc => alleSpieler.push(doc.id));
+  spielerSnap.forEach(d => alleSpieler.push(d.id));
 
-  const currentData = spielDoc.data();
+  const data = spielDoc.data();
+  const hostAktuell = data?.host;
 
-  // Falls kein Host oder Host weg → neuen Host setzen
-  if (!currentData.host || !alleSpieler.includes(currentData.host)) {
-    const neuerHost = alleSpieler[0];
-    await updateDoc(spielDocRef, {
-      host: neuerHost,
-      phase: "wartend" // Host-Wechsel = Lobby-Phase
-    });
+  // 2a) Host fehlt oder ist nicht mehr in der Lobby → neuen Host wählen
+  if (!hostAktuell || !alleSpieler.includes(hostAktuell)) {
+    const neuerHost = alleSpieler[0]; // erster gelisteter Spieler
+    if (neuerHost) {
+      await updateDoc(spielDocRef, { host: neuerHost, phase: "wartend" });
+      return neuerHost === userId;
+    }
+    return false; // (sollte praktisch nie passieren)
   }
 
-  return currentData.host === userId;
+  // 3) Host ist gesetzt → bist DU der Host?
+  return hostAktuell === userId;
 }
+
 
 
 // 🔁 HOST ANZEIGEN
@@ -104,14 +109,24 @@ function ladeHostLive() {
   const spielRef = doc(db, "spiele", SPIEL_ID);
   onSnapshot(spielRef, async (docSnap) => {
     const data = docSnap.data();
-    if (data?.host) {
-      const hostNameDoc = await getDoc(doc(db, "spiele", SPIEL_ID, "spieler", data.host));
+    const hostId = data?.host || null;
+
+    // Host-Name anzeigen
+    if (hostId) {
+      const hostNameDoc = await getDoc(doc(db, "spiele", SPIEL_ID, "spieler", hostId));
       const hostName = hostNameDoc.exists() ? hostNameDoc.data().name : "unbekannt";
       const el = document.getElementById("hostInfo");
       if (el) el.textContent = `👑 Host: ${hostName}`;
     }
+
+    // Host-Controls umschalten
+    const controls = document.getElementById("hostControls");
+    const binIchHost = hostId === userId;
+    istHost = binIchHost; // Status mitschreiben
+    if (controls) controls.style.display = binIchHost ? "block" : "none";
   });
 }
+
 
 // 🔁 LOBBY LIVE AKTUALISIEREN
 function liveSpielerAnzeigen() {
