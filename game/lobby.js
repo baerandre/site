@@ -53,16 +53,13 @@ function beobachtePhaseUndLeiteWeiter() {
     const data = docSnap.data();
     const neuePhase = data?.phase || "wartend";
 
-    // Nur reagieren, wenn Phase sich ändert
-    if (aktuellePhase !== neuePhase && neuePhase === "begriff_sammeln") {
-      if (!istHost) {
-        console.log("→ Spiel startet – Weiterleitung zu spiel.html");
-        window.location.href = "spiel.html";
-      }
+    if (aktuellePhase !== null && aktuellePhase !== neuePhase && neuePhase === "begriff_sammeln") {
+      if (!istHost) window.location.href = "spiel.html";
     }
     aktuellePhase = neuePhase;
   });
 }
+
 
 
 // 🔁 PRÜFEN, OB HOST
