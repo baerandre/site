@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wörter eingeben – Wort‑Imposter</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDKs (compat versions) -->
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>Wort eingeben</h2>
+    <p><strong>Kategorie:</strong> <span id="categoryDisplay">–</span></p>
+    <div id="inputSection">
+      <label for="wordInput">Dein Wort:</label>
+      <input type="text" id="wordInput" placeholder="z. B. Hund, Deutschland, Titanic …">
+      <button id="submitWordBtn">Wort abschicken</button>
+    </div>
+    <div id="hostExtra" class="hidden">
+      <label for="imposterWordInput">Imposter‑Wort (wird nicht gezogen):</label>
+      <input type="text" id="imposterWordInput" placeholder="Geheimes Wort, das der Imposter kennt">
+      <button id="collectWordsBtn">Begriffe sammeln &amp; Rollen zuweisen</button>
+    </div>
+    <p id="statusMsg"></p>
+  </div>
+  <script>
+    // Firebase config – bitte anpassen
+    const firebaseConfig = {
+      apiKey: "AIzaSyCddNTIlzKEN6Jc7hQTQGZXrPMHZujUhBA",
+      authDomain: "impostor-91214.firebaseapp.com",
+      projectId: "impostor-91214",
+      storageBucket: "impostor-91214.firebasestorage.app",
+      messagingSenderId: "278880540346",
+      appId: "1:278880540346:web:5d07473b7ee92dd118d483",
+      databaseURL: "https://impostor-91214-default-rtdb.europe-west1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Query‑Parameter lesen
+    const params = new URLSearchParams(window.location.search);
+    const lobbyId = params.get('lobby');
+    const playerId = params.get('playerId');
+
+    const categoryDisplay = document.getElementById('categoryDisplay');
+    const wordInput = document.getElementById('wordInput');
+    const submitWordBtn = document.getElementById('submitWordBtn');
+    const statusMsg = document.getElementById('statusMsg');
+    const hostExtra = document.getElementById('hostExtra');
+    const imposterWordInput = document.getElementById('imposterWordInput');
+    const collectWordsBtn = document.getElementById('collectWordsBtn');
+
+    // Kategorie anzeigen
+    db.ref(`lobbies/${lobbyId}/category`).on('value', snap => {
+      categoryDisplay.textContent = snap.val() || '–';
+    });
+    // Host bestimmen: falls Spieler host ist, zusätzliche Eingaben anzeigen
+    db.ref(`lobbies/${lobbyId}/hostId`).on('value', snap => {
+      if (snap.val() === playerId) {
+        hostExtra.classList.remove('hidden');
+      } else {
+        hostExtra.classList.add('hidden');
+      }
+    });
+    // Phase beobachten
+    db.ref(`lobbies/${lobbyId}/stage`).on('value', snap => {
+      const stage = snap.val();
+      if (stage === 'roles') {
+        // Weiterleiten zum Rollen‑Reveal
+        window.location.href = 'roles.html?lobby=' + lobbyId + '&playerId=' + playerId;
+      }
+    });
+
+    // Spieler sendet Wort
+    submitWordBtn.addEventListener('click', () => {
+      const word = wordInput.value.trim();
+      if (!word) return;
+      db.ref(`lobbies/${lobbyId}/players/${playerId}`).update({ word: word }).then(() => {
+        statusMsg.textContent = 'Wort gespeichert. Warte auf Host.';
+        submitWordBtn.disabled = true;
+        wordInput.disabled = true;
+      });
+    });
+
+    // Host sammelt Wörter & weist Rollen zu
+    collectWordsBtn.addEventListener('click', async () => {
+      const imposterWord = imposterWordInput.value.trim();
+      if (!imposterWord) {
+        alert('Bitte ein Imposter‑Wort eingeben.');
+        return;
+      }
+      // Hole alle Spieler
+      const playersSnap = await db.ref(`lobbies/${lobbyId}/players`).once('value');
+      const players = playersSnap.val() || {};
+      const playerIds = Object.keys(players);
+      if (playerIds.length < 3) {
+        alert('Es sollten mindestens drei Spieler teilnehmen, damit das Spiel Sinn ergibt.');
+        return;
+      }
+      // Zufällig einen Imposter bestimmen
+      const imposterIndex = Math.floor(Math.random() * playerIds.length);
+      const imposterId = playerIds[imposterIndex];
+      // Sammle alle vorgeschlagenen Wörter (ohne Leerzeichen) außer dem Imposter‑Wort
+      const submittedWords = [];
+      playerIds.forEach(id => {
+        const w = players[id].word;
+        if (w && w.toLowerCase() !== imposterWord.toLowerCase()) {
+          submittedWords.push(w);
+        }
+      });
+      if (submittedWords.length === 0) {
+        alert('Keine gültigen Spielerwörter vorhanden oder alle entsprechen dem Imposter‑Wort.');
+        return;
+      }
+      // Zufälliges Wort auswählen
+      const chosenWord = submittedWords[Math.floor(Math.random() * submittedWords.length)];
+      // Startspieler zufällig bestimmen
+      const startPlayerId = playerIds[Math.floor(Math.random() * playerIds.length)];
+      // Aktualisiere Datenbank mit Rollen und Wörtern
+      const updates = {};
+      updates[`lobbies/${lobbyId}/imposterId`] = imposterId;
+      updates[`lobbies/${lobbyId}/imposterWord`] = imposterWord;
+      updates[`lobbies/${lobbyId}/chosenWord`] = chosenWord;
+      updates[`lobbies/${lobbyId}/startPlayerId`] = startPlayerId;
+      updates[`lobbies/${lobbyId}/stage`] = 'roles';
+      await db.ref().update(updates);
+    });
+  </script>
+</body>
+</html>
