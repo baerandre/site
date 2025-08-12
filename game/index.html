@@ -16,6 +16,7 @@
     <p>Bitte gib deinen Namen ein, um der Lobby beizutreten:</p>
     <input type="text" id="playerNameInput" placeholder="Dein Name">
     <button id="joinBtn">Beitreten</button>
+    <p id="joinStatus" style="color: red;"></p>
   </div>
 
   <div class="container hidden" id="lobby-section">
@@ -150,13 +151,23 @@
         alert('Bitte gib einen gültigen Namen ein.');
         return;
       }
-      addPlayerToLobby(name).then(() => {
-        // Host festlegen, falls noch keiner definiert ist
-        assignHostIfNeeded();
-        joinSection.classList.add('hidden');
-        lobbySection.classList.remove('hidden');
-        listenToLobby();
-      });
+      addPlayerToLobby(name)
+        .then(() => {
+          // Host festlegen, falls noch keiner definiert ist
+          assignHostIfNeeded();
+          joinSection.classList.add('hidden');
+          lobbySection.classList.remove('hidden');
+          listenToLobby();
+        })
+        .catch((error) => {
+          // Falls ein Fehler beim Schreiben in die Datenbank auftritt
+          console.error('Fehler beim Beitreten:', error);
+          document.getElementById('joinStatus').textContent = 'Fehler beim Beitreten der Lobby: ' + (error.message || 'Unbekannter Fehler');
+          // Trotzdem Oberfläche zum Testen anzeigen
+          joinSection.classList.add('hidden');
+          lobbySection.classList.remove('hidden');
+          listenToLobby();
+        });
     });
 
     // Host: Kategorie setzen
