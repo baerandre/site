@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lobby – Wort‑Imposter</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDKs (compat versions for simplicity) -->
+  <!-- TODO: Replace version numbers with the latest stable versions if necessary -->
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container" id="join-section">
+    <h1>Wort‑Imposter Lobby</h1>
+    <p>Bitte gib deinen Namen ein, um der Lobby beizutreten:</p>
+    <input type="text" id="playerNameInput" placeholder="Dein Name">
+    <button id="joinBtn">Beitreten</button>
+  </div>
+
+  <div class="container hidden" id="lobby-section">
+    <h2>Lobby</h2>
+    <p><strong>Lobby ID:</strong> <span id="lobbyIdDisplay">mainLobby</span></p>
+    <p><strong>Host:</strong> <span id="hostNameDisplay">–</span></p>
+    <p><strong>Kategorie:</strong> <span id="categoryDisplay">(noch nicht gesetzt)</span></p>
+
+    <!-- Host controls -->
+    <div id="hostControls" class="hidden">
+      <label for="categoryInput">Kategorie festlegen:</label>
+      <input type="text" id="categoryInput" placeholder="z. B. Tiere, Länder, Filme …">
+      <button id="setCategoryBtn">Kategorie setzen</button>
+      <button id="startGameBtn">Spiel starten</button>
+      <button id="resetLobbyBtn">Lobby zurücksetzen</button>
+    </div>
+
+    <h3>Spieler</h3>
+    <ul id="playersList"></ul>
+
+    <button id="leaveLobbyBtn">Lobby verlassen</button>
+  </div>
+
+  <script>
+    // Firebase configuration – Füge hier deine eigenen Projektinformationen ein.
+    // Siehe https://firebase.google.com/docs/web/setup#config-object für Details.
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialisiere Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const lobbyId = 'mainLobby'; // Standard‑Lobby, kann nach Bedarf angepasst werden.
+    let currentPlayerId = null;
+
+    // DOM‑Elemente
+    const joinSection = document.getElementById('join-section');
+    const lobbySection = document.getElementById('lobby-section');
+    const joinBtn = document.getElementById('joinBtn');
+    const playerNameInput = document.getElementById('playerNameInput');
+    const playersList = document.getElementById('playersList');
+    const hostControls = document.getElementById('hostControls');
+    const hostNameDisplay = document.getElementById('hostNameDisplay');
+    const categoryDisplay = document.getElementById('categoryDisplay');
+    const categoryInput = document.getElementById('categoryInput');
+    const setCategoryBtn = document.getElementById('setCategoryBtn');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const resetLobbyBtn = document.getElementById('resetLobbyBtn');
+    const leaveLobbyBtn = document.getElementById('leaveLobbyBtn');
+
+    // Hilfsfunktion: Spieler in die Lobby eintragen
+    function addPlayerToLobby(name) {
+      const playersRef = db.ref(`lobbies/${lobbyId}/players`);
+      const newPlayerRef = playersRef.push();
+      currentPlayerId = newPlayerRef.key;
+      return newPlayerRef.set({
+        name: name,
+        role: null,
+        word: null
+      });
+    }
+
+    // Host bestimmen: Der erste Spieler, der beitritt, wird Host
+    function determineHostIfNeeded() {
+      const lobbyRef = db.ref(`lobbies/${lobbyId}`);
+      lobbyRef.child('players').once('value', snapshot => {
+        const players = snapshot.val();
+        if (players) {
+          const keys = Object.keys(players);
+          // Wenn noch kein Host gesetzt und mindestens ein Spieler vorhanden
+          lobbyRef.child('hostId').once('value', hostSnap => {
+            if (!hostSnap.val()) {
+              lobbyRef.update({ hostId: keys[0] });
+            }
+          });
+        }
+      });
+    }
+
+    // Lobby‑Daten beobachten
+    function listenToLobby() {
+      const lobbyRef = db.ref(`lobbies/${lobbyId}`);
+      // Spielerliste aktualisieren
+      lobbyRef.child('players').on('value', snapshot => {
+        const players = snapshot.val() || {};
+        playersList.innerHTML = '';
+        Object.entries(players).forEach(([id, player]) => {
+          const li = document.createElement('li');
+          li.textContent = player.name + (id === currentPlayerId ? ' (Du)' : '');
+          playersList.appendChild(li);
+        });
+      });
+      // Host‑Informationen anzeigen
+      lobbyRef.child('hostId').on('value', snapshot => {
+          const hostId = snapshot.val();
+          if (hostId) {
+            db.ref(`lobbies/${lobbyId}/players/${hostId}/name`).once('value', nameSnap => {
+              hostNameDisplay.textContent = nameSnap.val() || '–';
+            });
+            // Host controls nur für Host sichtbar
+            if (hostId === currentPlayerId) {
+              hostControls.classList.remove('hidden');
+            } else {
+              hostControls.classList.add('hidden');
+            }
+          }
+      });
+      // Kategorie anzeigen
+      lobbyRef.child('category').on('value', snapshot => {
+        const cat = snapshot.val();
+        categoryDisplay.textContent = cat || '(noch nicht gesetzt)';
+      });
+      // Weiterleitung zum nächsten Schritt
+      lobbyRef.child('stage').on('value', snapshot => {
+        const stage = snapshot.val();
+        if (stage === 'wordInput') {
+          // Seite zum Eingeben der Wörter laden
+          window.location.href = 'words.html?lobby=' + lobbyId + '&playerId=' + currentPlayerId;
+        }
+      });
+    }
+
+    // Eventlistener: Lobby beitreten
+    joinBtn.addEventListener('click', () => {
+      const name = playerNameInput.value.trim();
+      if (!name) {
+        alert('Bitte gib einen gültigen Namen ein.');
+        return;
+      }
+      addPlayerToLobby(name).then(() => {
+        determineHostIfNeeded();
+        joinSection.classList.add('hidden');
+        lobbySection.classList.remove('hidden');
+        listenToLobby();
+      });
+    });
+
+    // Host: Kategorie setzen
+    setCategoryBtn.addEventListener('click', () => {
+      const cat = categoryInput.value.trim();
+      if (!cat) return;
+      db.ref(`lobbies/${lobbyId}`).update({ category: cat });
+      categoryInput.value = '';
+    });
+
+    // Host: Spiel starten -> Wechsle in Wort‑Eingabe‑Phase
+    startGameBtn.addEventListener('click', () => {
+      db.ref(`lobbies/${lobbyId}`).update({ stage: 'wordInput' });
+    });
+
+    // Host: Lobby zurücksetzen
+    resetLobbyBtn.addEventListener('click', () => {
+      if (confirm('Bist du sicher, dass du die Lobby zurücksetzen möchtest? Dies entfernt alle Spieler und setzt die Kategorie zurück.')) {
+        db.ref(`lobbies/${lobbyId}`).set({
+          players: {},
+          hostId: null,
+          category: null,
+          stage: null
+        });
+        // Zum Join‑Screen zurückgehen
+        window.location.reload();
+      }
+    });
+
+    // Lobby verlassen
+    leaveLobbyBtn.addEventListener('click', () => {
+      if (currentPlayerId) {
+        db.ref(`lobbies/${lobbyId}/players/${currentPlayerId}`).remove();
+        // Wenn der Host geht, einen neuen Host bestimmen
+        db.ref(`lobbies/${lobbyId}/hostId`).once('value', snap => {
+          const hostId = snap.val();
+          if (hostId === currentPlayerId) {
+            determineHostIfNeeded();
+          }
+        });
+      }
+      // Zurück zum Join‑Screen
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>
