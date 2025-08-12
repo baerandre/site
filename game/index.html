@@ -43,13 +43,14 @@
     // Firebase configuration – Füge hier deine eigenen Projektinformationen ein.
     // Siehe https://firebase.google.com/docs/web/setup#config-object für Details.
     const firebaseConfig = {
-  apiKey: "AIzaSyCddNTIlzKEN6Jc7hQTQGZXrPMHZujUhBA",
-  authDomain: "impostor-91214.firebaseapp.com",
-  projectId: "impostor-91214",
-  storageBucket: "impostor-91214.firebasestorage.app",
-  messagingSenderId: "278880540346",
-  appId: "1:278880540346:web:5d07473b7ee92dd118d483"
-};
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     // Initialisiere Firebase
     firebase.initializeApp(firebaseConfig);
@@ -86,18 +87,13 @@
     }
 
     // Host bestimmen: Der erste Spieler, der beitritt, wird Host
-    function determineHostIfNeeded() {
-      const lobbyRef = db.ref(`lobbies/${lobbyId}`);
-      lobbyRef.child('players').once('value', snapshot => {
-        const players = snapshot.val();
-        if (players) {
-          const keys = Object.keys(players);
-          // Wenn noch kein Host gesetzt und mindestens ein Spieler vorhanden
-          lobbyRef.child('hostId').once('value', hostSnap => {
-            if (!hostSnap.val()) {
-              lobbyRef.update({ hostId: keys[0] });
-            }
-          });
+    // Der erste Spieler, der beitritt, wird automatisch Host.  Diese Funktion setzt den
+    // Host auf die aktuelle Spieler‑ID, falls noch kein Host existiert.
+    function assignHostIfNeeded() {
+      const hostRef = db.ref(`lobbies/${lobbyId}/hostId`);
+      hostRef.once('value', snap => {
+        if (!snap.val()) {
+          db.ref(`lobbies/${lobbyId}`).update({ hostId: currentPlayerId });
         }
       });
     }
@@ -153,7 +149,8 @@
         return;
       }
       addPlayerToLobby(name).then(() => {
-        determineHostIfNeeded();
+        // Host festlegen, falls noch keiner definiert ist
+        assignHostIfNeeded();
         joinSection.classList.add('hidden');
         lobbySection.classList.remove('hidden');
         listenToLobby();
@@ -195,7 +192,7 @@
         db.ref(`lobbies/${lobbyId}/hostId`).once('value', snap => {
           const hostId = snap.val();
           if (hostId === currentPlayerId) {
-            determineHostIfNeeded();
+            assignHostIfNeeded();
           }
         });
       }
