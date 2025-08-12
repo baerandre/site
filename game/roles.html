@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rollen – Wort‑Imposter</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>Deine Rolle</h2>
+    <p id="roleText">–</p>
+    <p id="wordReveal" class="hidden"><strong>Gemeinsames Wort:</strong> <span id="chosenWord">–</span></p>
+    <p><strong>Startspieler:</strong> <span id="startPlayerName">–</span></p>
+    <button id="backBtn" class="hidden">Zurück zur Lobby</button>
+  </div>
+  <script>
+    // Firebase config – anpassen
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    // Query Parameter
+    const params = new URLSearchParams(window.location.search);
+    const lobbyId = params.get('lobby');
+    const playerId = params.get('playerId');
+    const roleText = document.getElementById('roleText');
+    const wordReveal = document.getElementById('wordReveal');
+    const chosenWordSpan = document.getElementById('chosenWord');
+    const startPlayerNameSpan = document.getElementById('startPlayerName');
+    const backBtn = document.getElementById('backBtn');
+
+    // Holen der Spielinformationen
+    async function loadRoleInfo() {
+      const lobbyRef = db.ref(`lobbies/${lobbyId}`);
+      const [imposterIdSnap, chosenWordSnap, startPlayerIdSnap, playersSnap] = await Promise.all([
+        lobbyRef.child('imposterId').once('value'),
+        lobbyRef.child('chosenWord').once('value'),
+        lobbyRef.child('startPlayerId').once('value'),
+        lobbyRef.child('players').once('value')
+      ]);
+      const imposterId = imposterIdSnap.val();
+      const chosenWord = chosenWordSnap.val();
+      const startPlayerId = startPlayerIdSnap.val();
+      const players = playersSnap.val() || {};
+      // Startspieler anzeigen
+      const startName = players[startPlayerId] ? players[startPlayerId].name : '–';
+      startPlayerNameSpan.textContent = startName;
+      // Rolle bestimmen
+      if (playerId === imposterId) {
+        roleText.textContent = 'Du bist der Imposter! Dein Ziel ist es, das gemeinsame Wort zu erraten.';
+        wordReveal.classList.add('hidden');
+      } else {
+        roleText.textContent = 'Du bist ein Innocent! Du kennst das gemeinsame Wort und hilfst bei der Beschreibung.';
+        chosenWordSpan.textContent = chosenWord || '–';
+        wordReveal.classList.remove('hidden');
+      }
+      // Host kann zurück zur Lobby gehen
+      lobbyRef.child('hostId').once('value', snap => {
+        if (snap.val() === playerId) {
+          backBtn.classList.remove('hidden');
+        }
+      });
+    }
+    loadRoleInfo();
+
+    backBtn.addEventListener('click', () => {
+      // Host setzt die Lobby‑Phase zurück auf "lobby" für weiteres Spielen
+      db.ref(`lobbies/${lobbyId}`).update({ stage: null, chosenWord: null, imposterId: null, imposterWord: null, startPlayerId: null });
+      // leere die Wörter der Spieler, aber behalte sie in der Lobby
+      db.ref(`lobbies/${lobbyId}/players`).once('value').then(snap => {
+        const updates = {};
+        snap.forEach(child => {
+          updates[`lobbies/${lobbyId}/players/${child.key}/word`] = null;
+        });
+        return db.ref().update(updates);
+      }).then(() => {
+        window.location.href = 'index.html';
+      });
+    });
+  </script>
+</body>
+</html>
