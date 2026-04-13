@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aktivitätenliste</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f13;
+      --bg2: #17171f;
+      --bg3: #1e1e28;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0f0f5;
+      --muted: #8888a0;
+      --accent: #a78bfa;
+      --accent2: #f472b6;
+      --green: #34d399;
+      --red: #f87171;
+      --radius: 14px;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15,15,19,0.92);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .nav-logo { font-size: 1rem; font-weight: 600; color: var(--text); text-decoration: none; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.48rem 1rem; border-radius: 8px; font-size: 0.85rem;
+      font-weight: 500; text-decoration: none; transition: all 0.18s;
+      cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted);
+    }
+    .btn:hover { background: var(--bg3); border-color: var(--border2); color: var(--text); }
+    .btn-accent { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: #fff; }
+    .btn-accent:hover { opacity: 0.88; transform: translateY(-1px); color: #fff; }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+
+    /* ── LOGIN ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: calc(100vh - 60px); padding: 2rem;
+    }
+    .login-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 2.5rem 2rem;
+      width: 100%; max-width: 360px; text-align: center;
+    }
+    .login-icon {
+      width: 52px; height: 52px; background: rgba(167,139,250,0.1);
+      border: 1px solid rgba(167,139,250,0.2); border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; margin: 0 auto 1.2rem;
+    }
+    .login-card h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .login-card p { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.6rem; }
+    .login-card input {
+      width: 100%; padding: 0.65rem 1rem; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      font-size: 0.95rem; margin-bottom: 0.75rem; outline: none;
+      text-align: center; letter-spacing: 0.08em; transition: border-color 0.2s;
+    }
+    .login-card input:focus { border-color: var(--accent); }
+    .login-card button {
+      width: 100%; padding: 0.65rem; border-radius: 8px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 0.92rem; font-weight: 500; cursor: pointer; transition: opacity 0.2s;
+    }
+    .login-card button:hover { opacity: 0.88; }
+    .login-error { color: var(--red); font-size: 0.82rem; margin-top: 0.6rem; display: none; }
+
+    /* ── LIST VIEW ── */
+    #app-screen { display: none; }
+    .wrap { max-width: 700px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    .page-header { margin-bottom: 2rem; }
+    .page-header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .page-header p { color: var(--muted); font-size: 0.88rem; }
+
+    .stats { display: flex; gap: 0.7rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
+    .stat {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.65rem 1.1rem; text-align: center; min-width: 82px;
+    }
+    .stat-num { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .stat-num.pink { color: var(--accent2); }
+    .stat-num.green { color: var(--green); }
+    .stat-label { font-size: 0.72rem; color: var(--muted); }
+
+    .add-form { display: flex; gap: 0.6rem; margin-bottom: 1.2rem; }
+    .add-form input {
+      flex: 1; padding: 0.65rem 1rem; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 0.92rem; outline: none; transition: border-color 0.2s;
+    }
+    .add-form input:focus { border-color: var(--accent); }
+    .add-form input::placeholder { color: var(--muted); }
+
+    .filter-row { display: flex; gap: 0.45rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 0.3rem 0.85rem; border-radius: 999px; font-size: 0.8rem;
+      border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn:hover { color: var(--text); border-color: var(--border2); }
+    .filter-btn.active { background: rgba(167,139,250,0.12); border-color: var(--accent); color: var(--accent); }
+
+    .list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .list-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.85rem 1rem;
+      transition: border-color 0.2s; cursor: pointer;
+      animation: fadeIn 0.18s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
+    .list-item:hover { border-color: var(--border2); }
+    .list-item.done { opacity: 0.5; }
+    .list-item.done .item-text { text-decoration: line-through; color: var(--muted); }
+
+    .check-btn {
+      width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border);
+      background: transparent; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0; transition: all 0.18s; color: transparent; font-size: 0.68rem;
+    }
+    .check-btn:hover { border-color: var(--green); }
+    .list-item.done .check-btn { background: var(--green); border-color: var(--green); color: #0f0f13; }
+
+    .item-thumb {
+      width: 36px; height: 36px; border-radius: 7px; object-fit: cover;
+      flex-shrink: 0; border: 1px solid var(--border); background: var(--bg3);
+      display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--muted);
+    }
+    .item-thumb img { width: 100%; height: 100%; border-radius: 6px; object-fit: cover; }
+
+    .item-text { flex: 1; font-size: 0.92rem; }
+    .item-meta { font-size: 0.72rem; color: var(--muted); display: block; margin-top: 0.1rem; }
+    .item-date { font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
+    .delete-btn {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; transition: color 0.18s; flex-shrink: 0;
+    }
+    .delete-btn:hover { color: var(--red); }
+    .open-btn {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; font-size: 0.85rem; padding: 0.1rem 0.3rem; transition: color 0.18s; flex-shrink: 0;
+    }
+    .open-btn:hover { color: var(--accent); }
+
+    .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; font-size: 0.92rem; }
+    .empty span { display: block; font-size: 1.8rem; margin-bottom: 0.8rem; }
+
+    /* ── DETAIL VIEW ── */
+    #detail-screen { display: none; }
+    .detail-wrap { max-width: 700px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    .detail-back { margin-bottom: 1.5rem; }
+
+    .detail-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; margin-bottom: 1.8rem; flex-wrap: wrap;
+    }
+    .detail-title-row h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .detail-title-row span { font-size: 0.8rem; color: var(--muted); }
+    .done-badge {
+      font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.8rem;
+      border-radius: 999px; background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.2);
+    }
+    .open-badge {
+      font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.8rem;
+      border-radius: 999px; background: rgba(167,139,250,0.1); color: var(--accent); border: 1px solid rgba(167,139,250,0.2);
+    }
+
+    .detail-section { margin-bottom: 2rem; }
+    .detail-section-label {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem;
+    }
+
+    .notes-area {
+      width: 100%; padding: 0.85rem 1rem; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+      font-size: 0.9rem; font-family: inherit; resize: vertical; min-height: 120px;
+      outline: none; transition: border-color 0.2s; line-height: 1.7;
+    }
+    .notes-area:focus { border-color: var(--accent); }
+    .notes-area::placeholder { color: var(--muted); }
+
+    .image-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+    .image-item {
+      position: relative; border-radius: 10px; overflow: hidden;
+      aspect-ratio: 1; border: 1px solid var(--border); background: var(--bg3);
+    }
+    .image-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .image-del {
+      position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.65);
+      border: none; color: #fff; border-radius: 6px; width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      font-size: 0.75rem; opacity: 0; transition: opacity 0.15s;
+    }
+    .image-item:hover .image-del { opacity: 1; }
+
+    .upload-label {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.4rem; border: 1.5px dashed var(--border2); border-radius: 10px;
+      padding: 1.2rem; cursor: pointer; color: var(--muted); font-size: 0.82rem;
+      transition: border-color 0.2s, color 0.2s; text-align: center; min-height: 90px;
+    }
+    .upload-label:hover { border-color: var(--accent); color: var(--accent); }
+    .upload-label input { display: none; }
+    .upload-icon { font-size: 1.3rem; }
+
+    .save-row { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
+    .save-msg { font-size: 0.8rem; color: var(--green); align-self: center; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">— Startseite</a>
+  <div style="display:flex;gap:0.6rem;align-items:center;">
+    <a href="index.html" class="btn">← Startseite</a>
+    <button class="btn" id="logout-btn" onclick="logout()" style="display:none;">Abmelden</button>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">🔒</div>
+    <h2>Nur für uns</h2>
+    <p>Gib das Passwort ein, um zur Liste zu gelangen.</p>
+    <input type="password" id="pw-input" placeholder="Passwort" onkeydown="if(event.key==='Enter')tryLogin()" autofocus />
+    <button onclick="tryLogin()">Einloggen</button>
+    <div class="login-error" id="login-error">Falsches Passwort.</div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div id="app-screen">
+  <div class="wrap">
+    <div class="page-header">
+      <h1>Aktivitätenliste</h1>
+      <p>Ideen und Pläne für uns — klicke eine Aktivität an, um Details hinzuzufügen.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Gesamt</div></div>
+      <div class="stat"><div class="stat-num pink" id="stat-open">0</div><div class="stat-label">Offen</div></div>
+      <div class="stat"><div class="stat-num green" id="stat-done">0</div><div class="stat-label">Erledigt</div></div>
+    </div>
+    <div class="add-form">
+      <input type="text" id="new-item" placeholder="Neue Aktivität hinzufügen …" onkeydown="if(event.key==='Enter')addItem()" />
+      <button class="btn btn-accent" onclick="addItem()">Hinzufügen</button>
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Alle</button>
+      <button class="filter-btn" onclick="setFilter('open',this)">Offen</button>
+      <button class="filter-btn" onclick="setFilter('done',this)">Erledigt</button>
+    </div>
+    <div class="list" id="item-list"></div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="detail-screen">
+  <div class="detail-wrap">
+    <div class="detail-back">
+      <button class="btn" onclick="showList()">← Zurück zur Liste</button>
+    </div>
+    <div class="detail-header">
+      <div class="detail-title-row">
+        <h2 id="detail-title">—</h2>
+        <span id="detail-date"></span>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <span id="detail-badge" class="open-badge">Offen</span>
+        <button class="btn btn-sm" id="detail-toggle-btn" onclick="toggleDetailDone()">Als erledigt markieren</button>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-label">Notizen</div>
+      <textarea class="notes-area" id="detail-notes" placeholder="Schreib hier Notizen, Ideen oder Beschreibungen …"></textarea>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-label">Bilder</div>
+      <div class="image-grid" id="detail-images"></div>
+      <label class="upload-label">
+        <span class="upload-icon">＋</span>
+        <span>Bild hinzufügen</span>
+        <input type="file" accept="image/*" multiple onchange="handleImageUpload(event)" />
+      </label>
+    </div>
+
+    <div class="save-row">
+      <span class="save-msg" id="save-msg" style="display:none;">Gespeichert ✓</span>
+      <button class="btn btn-accent" onclick="saveDetail()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PASSWORD = 'DieListe';
+const KEY = 'aktivitaeten_v2';
+let items = [], filter = 'all', currentId = null;
+
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function tryLogin() {
+  if (document.getElementById('pw-input').value === PASSWORD) {
+    sessionStorage.setItem('auth','1');
+    showApp();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('auth');
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('logout-btn').style.display = 'inline-flex';
+  load(); render();
+}
+
+function showList() {
+  document.getElementById('detail-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  render();
+}
+
+function load() {
+  try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch { items = []; }
+}
+
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(items));
+}
+
+function addItem() {
+  const inp = document.getElementById('new-item');
+  const text = inp.value.trim();
+  if (!text) return;
+  items.unshift({ id: Date.now(), text, done: false, date: new Date().toLocaleDateString('de-DE'), notes: '', images: [] });
+  save(); render(); inp.value = ''; inp.focus();
+}
+
+function toggleDone(id, e) {
+  e.stopPropagation();
+  const it = items.find(i => i.id === id);
+  if (it) { it.done = !it.done; save(); render(); }
+}
+
+function deleteItem(id, e) {
+  e.stopPropagation();
+  if (!confirm('Aktivität löschen?')) return;
+  items = items.filter(i => i.id !== id);
+  save(); render();
+}
+
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render() {
+  const filtered = items.filter(i => filter === 'all' ? true : filter === 'done' ? i.done : !i.done);
+  document.getElementById('stat-total').textContent = items.length;
+  document.getElementById('stat-open').textContent = items.filter(i => !i.done).length;
+  document.getElementById('stat-done').textContent = items.filter(i => i.done).length;
+  const list = document.getElementById('item-list');
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty"><span>' + (filter==='done'?'✓':'✦') + '</span>' +
+      (filter==='done'?'Noch nichts erledigt.':filter==='open'?'Alles erledigt!':'Noch keine Aktivitäten.') + '</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(it => {
+    const hasImg = it.images && it.images.length > 0;
+    const thumbHtml = hasImg
+      ? `<div class="item-thumb"><img src="${it.images[0]}" alt="" /></div>`
+      : `<div class="item-thumb" style="font-size:0.65rem;color:var(--muted);">kein Bild</div>`;
+    const noteMeta = it.notes ? `<span class="item-meta">${esc(it.notes.substring(0,60))}${it.notes.length>60?'…':''}</span>` : '';
+    return `<div class="list-item ${it.done?'done':''}" onclick="openDetail(${it.id})">
+      <button class="check-btn" onclick="toggleDone(${it.id},event)" title="Abhaken">✓</button>
+      ${thumbHtml}
+      <div class="item-text">${esc(it.text)}${noteMeta}</div>
+      <span class="item-date">${it.date}</span>
+      <button class="open-btn" onclick="openDetail(${it.id});event.stopPropagation();" title="Details">→</button>
+      <button class="delete-btn" onclick="deleteItem(${it.id},event)" title="Löschen">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function openDetail(id) {
+  currentId = id;
+  const it = items.find(i => i.id === id);
+  if (!it) return;
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('detail-screen').style.display = 'block';
+  document.getElementById('detail-title').textContent = it.text;
+  document.getElementById('detail-date').textContent = 'Hinzugefügt am ' + it.date;
+  document.getElementById('detail-notes').value = it.notes || '';
+  updateDetailBadge(it);
+  renderImages(it);
+  document.getElementById('save-msg').style.display = 'none';
+}
+
+function updateDetailBadge(it) {
+  const badge = document.getElementById('detail-badge');
+  const btn = document.getElementById('detail-toggle-btn');
+  if (it.done) {
+    badge.className = 'done-badge'; badge.textContent = 'Erledigt';
+    btn.textContent = 'Als offen markieren';
+  } else {
+    badge.className = 'open-badge'; badge.textContent = 'Offen';
+    btn.textContent = 'Als erledigt markieren';
+  }
+}
+
+function toggleDetailDone() {
+  const it = items.find(i => i.id === currentId);
+  if (!it) return;
+  it.done = !it.done;
+  save(); updateDetailBadge(it);
+}
+
+function renderImages(it) {
+  const grid = document.getElementById('detail-images');
+  if (!it.images || !it.images.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = it.images.map((src, idx) => `
+    <div class="image-item">
+      <img src="${src}" alt="Bild ${idx+1}" />
+      <button class="image-del" onclick="removeImage(${idx})" title="Bild entfernen">✕</button>
+    </div>`).join('');
+}
+
+function removeImage(idx) {
+  const it = items.find(i => i.id === currentId);
+  if (!it) return;
+  it.images.splice(idx, 1);
+  save(); renderImages(it);
+}
+
+function handleImageUpload(e) {
+  const it = items.find(i => i.id === currentId);
+  if (!it) return;
+  if (!it.images) it.images = [];
+  const files = Array.from(e.target.files);
+  let done = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      it.images.push(ev.target.result);
+      done++;
+      if (done === files.length) { save(); renderImages(it); }
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function saveDetail() {
+  const it = items.find(i => i.id === currentId);
+  if (!it) return;
+  it.notes = document.getElementById('detail-notes').value;
+  save();
+  const msg = document.getElementById('save-msg');
+  msg.style.display = 'inline';
+  setTimeout(() => msg.style.display = 'none', 2000);
+}
+
+if (sessionStorage.getItem('auth') === '1') showApp();
+</script>
+</body>
+</html>
