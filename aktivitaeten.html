@@ -245,7 +245,23 @@ let ghToken = '', ghRepo = '';
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function getHeaders() {
-  return { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+  return { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+}
+
+function base64ToUtf8(base64) {
+  const binary = atob((base64 || '').replace(/\n/g, ''));
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 /* ── SETUP ── */
@@ -322,18 +338,42 @@ async function loadFromGitHub() {
       render(); return;
     }
     if (!r.ok) throw new Error('Ladefehler ' + r.status);
+
     const data = await r.json();
     fileSha = data.sha;
-    items = JSON.parse(atob(data.content.replace(/\n/g,'')));
+
+    let rawText = '';
+
+    if (data.encoding === 'base64' && data.content) {
+      rawText = base64ToUtf8(data.content);
+    } else if (data.git_url) {
+      const blobRes = await fetch(data.git_url, { headers: getHeaders() });
+      if (!blobRes.ok) throw new Error('Blob-Ladefehler ' + blobRes.status);
+      const blobData = await blobRes.json();
+      if (blobData.encoding !== 'base64' || !blobData.content) {
+        throw new Error('Dateiinhalt fehlt oder ist nicht lesbar.');
+      }
+      rawText = base64ToUtf8(blobData.content);
+    } else {
+      throw new Error('Dateiinhalt fehlt oder ist nicht lesbar.');
+    }
+
+    if (!rawText.trim()) throw new Error('aktivitaeten.json ist leer.');
+
+    const parsed = JSON.parse(rawText);
+    if (!Array.isArray(parsed)) throw new Error('aktivitaeten.json hat ein ungueltiges Format.');
+
+    items = parsed;
     setSyncStatus('ok', 'Synchronisiert · ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}));
     render();
   } catch(e) {
+    console.error(e);
     setSyncStatus('error', 'Fehler: ' + e.message);
   }
 }
 
 async function pushToGitHub(commitMsg) {
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(items, null, 2))));
+  const content = utf8ToBase64(JSON.stringify(items, null, 2));
   const body = { message: commitMsg, content };
   if (fileSha) body.sha = fileSha;
   const r = await fetch(`https://api.github.com/repos/${ghRepo}/contents/${DATA_PATH}`, {
