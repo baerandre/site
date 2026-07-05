@@ -10,7 +10,6 @@
 <!-- Firebase (kostenlose Firestore-Datenbank für gemeinsame Bearbeitung) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <style>
   :root{
@@ -394,25 +393,9 @@
    2. Klicke auf "Web-App hinzufügen" (</> Icon) und kopiere das config-Objekt.
    3. Ersetze das Objekt unten (firebaseConfig) mit deinem eigenen.
    4. Aktiviere im Firebase-Konsolenmenü unter "Firestore Database" eine
-      Datenbank (Modus "Testmodus" reicht zum Start).
-   5. LOGIN EINRICHTEN:
-      a) Firebase-Konsole -> "Authentication" -> "Sign-in method" ->
-         "E-Mail/Passwort" aktivieren.
-      b) Reiter "Users" -> "Nutzer hinzufuegen" -> z.B.
-         E-Mail: gruppe@usa-trip.local   Passwort: euer-gemeinsames-passwort
-         (die E-Mail muss keine echte Adresse sein, sie dient nur als Login-ID)
-      c) Trage dieselbe E-Mail unten bei SHARED_LOGIN_EMAIL ein.
-   6. WICHTIG fuer echte Sicherheit: Setze in der Firebase-Konsole unter
-      "Firestore Database" -> "Regeln" folgendes, damit nur angemeldete
-      Nutzer lesen/schreiben koennen:
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            match /usaTrip/{doc} {
-              allow read, write: if request.auth != null;
-            }
-          }
-        }
+      Datenbank (Modus "Testmodus" reicht, da hier kein Firebase-Login
+      mehr genutzt wird — der Zugriffsschutz laeuft ueber das statische
+      Passwort unten).
    ========================================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAfgkYOpTIpSJ0g_mPwTbYo5it7jPEwzl8",
@@ -423,11 +406,11 @@ const firebaseConfig = {
   appId: "1:921956314205:web:6f1aa34b7808232478f1b4"
 };
 
-// Die E-Mail-Adresse des gemeinsamen Gruppen-Logins (siehe Schritt 5b oben)
-const SHARED_LOGIN_EMAIL = "baer_andre@web.de";
+// Gemeinsames Passwort für die Reisegruppe (im Klartext im Code — siehe Hinweis im Chat)
+const SITE_PASSWORD = "USA1887!";
+const LOGIN_STORAGE_KEY = "usaTripLoggedIn";
 
 let db = null;
-let auth = null;
 let docRef = null;
 let firebaseReady = false;
 
@@ -492,27 +475,15 @@ function connectFirestore(){
 function initFirebase(){
   try{
     if(firebaseConfig.apiKey === "DEIN_API_KEY"){
-      // Firebase noch nicht konfiguriert: Login überspringen, nur lokaler Testmodus
-      showApp();
-      setSyncStatus('error', 'Firebase noch nicht konfiguriert — Daten werden nur lokal in diesem Browser gehalten (kein Login aktiv).');
+      setSyncStatus('error', 'Firebase noch nicht konfiguriert — Daten werden nur lokal in diesem Browser gehalten.');
       renderAll();
       return;
     }
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    auth = firebase.auth();
-
-    auth.onAuthStateChanged((user) => {
-      if(user){
-        showApp();
-        connectFirestore();
-      } else {
-        showLogin();
-      }
-    });
+    connectFirestore();
   } catch(e){
     console.error(e);
-    showApp();
     setSyncStatus('error', 'Firebase-Fehler — Daten werden nur lokal gehalten.');
     renderAll();
   }
@@ -523,16 +494,22 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
   const pw = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
-  if(!auth){
-    errEl.textContent = 'Login nicht verfügbar.';
-    return;
+  if(pw === SITE_PASSWORD){
+    localStorage.setItem(LOGIN_STORAGE_KEY, 'true');
+    showApp();
+    initFirebase();
+  } else {
+    errEl.textContent = 'Falsches Passwort.';
   }
-  auth.signInWithEmailAndPassword(SHARED_LOGIN_EMAIL, pw)
-    .catch((err) => {
-      console.error(err);
-      errEl.textContent = 'Fehler: ' + err.code + ' — ' + err.message;
-    });
 });
+
+// Login-Status aus vorherigem Besuch prüfen
+if(localStorage.getItem(LOGIN_STORAGE_KEY) === 'true'){
+  showApp();
+  initFirebase();
+} else {
+  showLogin();
+}
 
 function scheduleSave(){
   if(!firebaseReady || !docRef) return;
@@ -760,8 +737,6 @@ function renderAll(){
   renderExpenses();
   renderPacking();
 }
-
-initFirebase();
 </script>
 </body>
 </html>
