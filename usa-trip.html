@@ -10,6 +10,7 @@
 <!-- Firebase (kostenlose Firestore-Datenbank für gemeinsame Bearbeitung) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <style>
   :root{
@@ -393,9 +394,25 @@
    2. Klicke auf "Web-App hinzufügen" (</> Icon) und kopiere das config-Objekt.
    3. Ersetze das Objekt unten (firebaseConfig) mit deinem eigenen.
    4. Aktiviere im Firebase-Konsolenmenü unter "Firestore Database" eine
-      Datenbank (Modus "Testmodus" reicht, da hier kein Firebase-Login
-      mehr genutzt wird — der Zugriffsschutz laeuft ueber das statische
-      Passwort unten).
+      Datenbank (Modus "Testmodus" reicht zum Start).
+   5. LOGIN EINRICHTEN:
+      a) Firebase-Konsole -> "Authentication" -> "Sign-in method" ->
+         "E-Mail/Passwort" aktivieren.
+      b) Reiter "Users" -> "Nutzer hinzufuegen" -> z.B.
+         E-Mail: gruppe@usa-trip.local   Passwort: euer-gemeinsames-passwort
+         (die E-Mail muss keine echte Adresse sein, sie dient nur als Login-ID)
+      c) Trage dieselbe E-Mail unten bei SHARED_LOGIN_EMAIL ein.
+   6. WICHTIG fuer echte Sicherheit: Setze in der Firebase-Konsole unter
+      "Firestore Database" -> "Regeln" folgendes, damit nur angemeldete
+      Nutzer lesen/schreiben koennen:
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /usaTrip/{doc} {
+              allow read, write: if request.auth != null;
+            }
+          }
+        }
    ========================================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAfgkYOpTIpSJ0g_mPwTbYo5it7jPEwzl8",
@@ -406,11 +423,11 @@ const firebaseConfig = {
   appId: "1:921956314205:web:6f1aa34b7808232478f1b4"
 };
 
-// Gemeinsames Passwort für die Reisegruppe (im Klartext im Code — siehe Hinweis im Chat)
-const SITE_PASSWORD = "USA1887!";
-const LOGIN_STORAGE_KEY = "usaTripLoggedIn";
+// Die E-Mail-Adresse des gemeinsamen Gruppen-Logins (siehe Schritt 5b oben)
+const SHARED_LOGIN_EMAIL = "baer_andre@web.de";
 
 let db = null;
+let auth = null;
 let docRef = null;
 let firebaseReady = false;
 
@@ -452,25 +469,15 @@ function showLogin(message){
   if(message) document.getElementById('loginError').textContent = message;
 }
 
-let hasRenderedOnce = false;
-
 function connectFirestore(){
   docRef = db.collection('usaTrip').doc('sharedData');
   docRef.onSnapshot((snap) => {
     if(snap.exists){
-      const incoming = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), snap.data());
+      state = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), snap.data());
       ['days','activities','restaurants','expenses','packing'].forEach(k=>{
-        if(!Array.isArray(incoming[k])) incoming[k] = DEFAULT_STATE[k];
+        if(!Array.isArray(state[k])) state[k] = DEFAULT_STATE[k];
       });
-      // Nur neu zeichnen, wenn sich die Daten wirklich geändert haben.
-      // Verhindert, dass beim eigenen Tippen (lokales Echo aus Firestore)
-      // die Eingabefelder neu aufgebaut werden und der Cursor/Fokus verloren geht.
-      const changed = !hasRenderedOnce || JSON.stringify(incoming) !== JSON.stringify(state);
-      state = incoming;
-      if(changed){
-        renderAll();
-        hasRenderedOnce = true;
-      }
+      renderAll();
       setSyncStatus('', 'Live verbunden — Änderungen werden für alle synchronisiert.');
     } else {
       docRef.set(state).then(()=> setSyncStatus('', 'Neues Dokument angelegt — live verbunden.'));
@@ -485,15 +492,27 @@ function connectFirestore(){
 function initFirebase(){
   try{
     if(firebaseConfig.apiKey === "DEIN_API_KEY"){
-      setSyncStatus('error', 'Firebase noch nicht konfiguriert — Daten werden nur lokal in diesem Browser gehalten.');
+      // Firebase noch nicht konfiguriert: Login überspringen, nur lokaler Testmodus
+      showApp();
+      setSyncStatus('error', 'Firebase noch nicht konfiguriert — Daten werden nur lokal in diesem Browser gehalten (kein Login aktiv).');
       renderAll();
       return;
     }
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    connectFirestore();
+    auth = firebase.auth();
+
+    auth.onAuthStateChanged((user) => {
+      if(user){
+        showApp();
+        connectFirestore();
+      } else {
+        showLogin();
+      }
+    });
   } catch(e){
     console.error(e);
+    showApp();
     setSyncStatus('error', 'Firebase-Fehler — Daten werden nur lokal gehalten.');
     renderAll();
   }
@@ -504,22 +523,16 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
   const pw = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
-  if(pw === SITE_PASSWORD){
-    localStorage.setItem(LOGIN_STORAGE_KEY, 'true');
-    showApp();
-    initFirebase();
-  } else {
-    errEl.textContent = 'Falsches Passwort.';
+  if(!auth){
+    errEl.textContent = 'Login nicht verfügbar.';
+    return;
   }
+  auth.signInWithEmailAndPassword(SHARED_LOGIN_EMAIL, pw)
+    .catch((err) => {
+      console.error(err);
+      errEl.textContent = 'Fehler: ' + err.code + ' — ' + err.message;
+    });
 });
-
-// Login-Status aus vorherigem Besuch prüfen
-if(localStorage.getItem(LOGIN_STORAGE_KEY) === 'true'){
-  showApp();
-  initFirebase();
-} else {
-  showLogin();
-}
 
 function scheduleSave(){
   if(!firebaseReady || !docRef) return;
@@ -675,31 +688,17 @@ function renderExpenses(){
     const betrag = parseFloat(ex.betrag) || 0;
     const proPerson = (betrag / 4).toFixed(2);
     const tr = document.createElement('tr');
-    tr.dataset.rowIdx = idx;
     tr.innerHTML = `
       <td><input type="text" value="${escapeAttr(ex.posten)}" data-idx="${idx}" data-field="posten" class="exp-input"></td>
       <td>${selectHtml(cats, ex.kategorie, idx, 'kategorie', 'exp-select')}</td>
       <td><input type="number" value="${escapeAttr(ex.betrag)}" data-idx="${idx}" data-field="betrag" class="exp-input"></td>
       <td>${selectHtml(paidByOptions(), ex.bezahltVon, idx, 'bezahltVon', 'exp-select')}</td>
-      <td style="text-align:right;" class="exp-per-person">$${proPerson}</td>
+      <td style="text-align:right;">$${proPerson}</td>
       <td class="row-actions"><button class="btn small danger" onclick="removeRow('expenses',${idx})">✕</button></td>`;
     body.appendChild(tr);
   });
   body.querySelectorAll('.exp-input').forEach(inp => inp.addEventListener('input', e => {
-    const idx = e.target.dataset.idx;
-    const field = e.target.dataset.field;
-    state.expenses[idx][field] = e.target.value;
-    scheduleSave();
-    if(field === 'betrag'){
-      // Nur die betroffene Zelle live aktualisieren statt der ganzen Tabelle,
-      // damit der Cursor beim Tippen im Feld bleibt.
-      const row = body.querySelector(`tr[data-row-idx="${idx}"]`);
-      if(row){
-        const betrag = parseFloat(e.target.value) || 0;
-        row.querySelector('.exp-per-person').textContent = '$' + (betrag / 4).toFixed(2);
-      }
-      renderBudget();
-    }
+    state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
   }));
   body.querySelectorAll('.exp-select').forEach(sel => sel.addEventListener('change', e => {
     state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
@@ -761,6 +760,8 @@ function renderAll(){
   renderExpenses();
   renderPacking();
 }
+
+initFirebase();
 </script>
 </body>
 </html>
