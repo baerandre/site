@@ -530,7 +530,7 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
   auth.signInWithEmailAndPassword(SHARED_LOGIN_EMAIL, pw)
     .catch((err) => {
       console.error(err);
-      errEl.textContent = 'Falsches Passwort oder Login nicht eingerichtet.';
+      errEl.textContent = 'Fehler: ' + err.code + ' — ' + err.message;
     });
 });
 
