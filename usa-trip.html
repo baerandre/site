@@ -452,15 +452,25 @@ function showLogin(message){
   if(message) document.getElementById('loginError').textContent = message;
 }
 
+let hasRenderedOnce = false;
+
 function connectFirestore(){
   docRef = db.collection('usaTrip').doc('sharedData');
   docRef.onSnapshot((snap) => {
     if(snap.exists){
-      state = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), snap.data());
+      const incoming = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), snap.data());
       ['days','activities','restaurants','expenses','packing'].forEach(k=>{
-        if(!Array.isArray(state[k])) state[k] = DEFAULT_STATE[k];
+        if(!Array.isArray(incoming[k])) incoming[k] = DEFAULT_STATE[k];
       });
-      renderAll();
+      // Nur neu zeichnen, wenn sich die Daten wirklich geändert haben.
+      // Verhindert, dass beim eigenen Tippen (lokales Echo aus Firestore)
+      // die Eingabefelder neu aufgebaut werden und der Cursor/Fokus verloren geht.
+      const changed = !hasRenderedOnce || JSON.stringify(incoming) !== JSON.stringify(state);
+      state = incoming;
+      if(changed){
+        renderAll();
+        hasRenderedOnce = true;
+      }
       setSyncStatus('', 'Live verbunden — Änderungen werden für alle synchronisiert.');
     } else {
       docRef.set(state).then(()=> setSyncStatus('', 'Neues Dokument angelegt — live verbunden.'));
@@ -665,17 +675,31 @@ function renderExpenses(){
     const betrag = parseFloat(ex.betrag) || 0;
     const proPerson = (betrag / 4).toFixed(2);
     const tr = document.createElement('tr');
+    tr.dataset.rowIdx = idx;
     tr.innerHTML = `
       <td><input type="text" value="${escapeAttr(ex.posten)}" data-idx="${idx}" data-field="posten" class="exp-input"></td>
       <td>${selectHtml(cats, ex.kategorie, idx, 'kategorie', 'exp-select')}</td>
       <td><input type="number" value="${escapeAttr(ex.betrag)}" data-idx="${idx}" data-field="betrag" class="exp-input"></td>
       <td>${selectHtml(paidByOptions(), ex.bezahltVon, idx, 'bezahltVon', 'exp-select')}</td>
-      <td style="text-align:right;">$${proPerson}</td>
+      <td style="text-align:right;" class="exp-per-person">$${proPerson}</td>
       <td class="row-actions"><button class="btn small danger" onclick="removeRow('expenses',${idx})">✕</button></td>`;
     body.appendChild(tr);
   });
   body.querySelectorAll('.exp-input').forEach(inp => inp.addEventListener('input', e => {
-    state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
+    const idx = e.target.dataset.idx;
+    const field = e.target.dataset.field;
+    state.expenses[idx][field] = e.target.value;
+    scheduleSave();
+    if(field === 'betrag'){
+      // Nur die betroffene Zelle live aktualisieren statt der ganzen Tabelle,
+      // damit der Cursor beim Tippen im Feld bleibt.
+      const row = body.querySelector(`tr[data-row-idx="${idx}"]`);
+      if(row){
+        const betrag = parseFloat(e.target.value) || 0;
+        row.querySelector('.exp-per-person').textContent = '$' + (betrag / 4).toFixed(2);
+      }
+      renderBudget();
+    }
   }));
   body.querySelectorAll('.exp-select').forEach(sel => sel.addEventListener('change', e => {
     state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
