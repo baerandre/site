@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USA Roadtrip Planer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (kostenlose Firestore-Datenbank für gemeinsame Bearbeitung) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<style>
+  :root{
+    --sand: #F3EEE2;
+    --sand-deep: #E8DFC9;
+    --forest: #2F4538;
+    --forest-dark: #1E2E25;
+    --rust: #BC6C41;
+    --rust-dark: #9C5530;
+    --gold: #C9A15E;
+    --ink: #2B2A26;
+    --ink-soft: #6B6558;
+    --line: #D8CFB8;
+    --white: #FFFDF8;
+    --danger: #A6402F;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--sand);
+    color: var(--ink);
+    font-family: 'Source Sans 3', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ---------- Topo-Linien Hintergrund im Header ---------- */
+  .hero{
+    position: relative;
+    background: linear-gradient(180deg, var(--forest) 0%, var(--forest-dark) 100%);
+    color: var(--white);
+    padding: 38px 24px 28px;
+    overflow: hidden;
+  }
+  .hero svg.topo{
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0.14; pointer-events:none;
+  }
+  .hero-inner{ position:relative; max-width: 1100px; margin: 0 auto; }
+  .eyebrow{
+    font-family:'Oswald', sans-serif;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  h1{
+    font-family:'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: clamp(28px, 4vw, 42px);
+    margin: 0 0 8px;
+    letter-spacing: 0.5px;
+  }
+  .hero p.sub{ margin:0; color: #D9D2BE; font-size: 15px; }
+  #syncStatus{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; color:#D9D2BE; margin-top:14px;
+  }
+  #syncStatus .dot{ width:8px; height:8px; border-radius:50%; background:var(--gold); }
+  #syncStatus.saving .dot{ background: #E0B84A; animation: pulse 1s infinite; }
+  #syncStatus.error .dot{ background: var(--danger); }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    max-width: 1100px; margin: -18px auto 0; padding: 0 24px;
+    display:flex; gap:6px; flex-wrap:wrap; position:relative; z-index:2;
+  }
+  nav.tabs button{
+    font-family:'Oswald', sans-serif;
+    font-weight:600; letter-spacing:0.5px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    color: var(--ink-soft);
+    padding: 12px 18px 10px;
+    border-radius: 8px 8px 0 0;
+    cursor:pointer;
+    font-size: 14px;
+    transition: all .15s ease;
+  }
+  nav.tabs button .marker{ color: var(--rust); margin-right:6px; font-size:11px; }
+  nav.tabs button.active{
+    background: var(--white);
+    color: var(--forest);
+    box-shadow: 0 -2px 0 var(--rust) inset;
+  }
+  nav.tabs button:not(.active):hover{ background: var(--sand-deep); }
+
+  main{
+    max-width: 1100px; margin: 0 auto; padding: 24px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-top: none;
+    min-height: 60vh;
+  }
+  section.panel{ display:none; }
+  section.panel.active{ display:block; animation: fade .2s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+
+  h2{
+    font-family:'Oswald', sans-serif;
+    color: var(--forest);
+    font-size: 20px;
+    margin: 0 0 4px;
+    display:flex; align-items:center; gap:10px;
+  }
+  h2::before{
+    content:"";
+    width: 4px; height: 20px;
+    background: var(--rust);
+    display:inline-block;
+    border-radius: 2px;
+  }
+  p.hint{ color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; }
+
+  table{ width:100%; border-collapse: collapse; font-size: 13.5px; }
+  th{
+    text-align:left; font-family:'Oswald',sans-serif; font-weight:600;
+    background: var(--forest); color: var(--white);
+    padding: 9px 10px; font-size: 12px; letter-spacing:0.3px;
+    text-transform: uppercase;
+  }
+  td{ padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td{ background: #FAF7EF; }
+  td[contenteditable="true"], input, select{
+    font-family:'Source Sans 3', sans-serif; font-size:13.5px; color:var(--ink);
+    background: transparent; border: 1px solid transparent; border-radius:4px;
+    padding: 4px 6px; width:100%;
+  }
+  td[contenteditable="true"]:hover, td[contenteditable="true"]:focus,
+  input:hover, input:focus, select:hover, select:focus{
+    border-color: var(--gold); background: #FFFDF3; outline:none;
+  }
+  td.daynum{ font-family:'Oswald',sans-serif; font-weight:600; color:var(--rust); text-align:center; }
+
+  .btn{
+    font-family:'Oswald', sans-serif; font-weight:600; letter-spacing:0.3px;
+    background: var(--rust); color: var(--white); border:none;
+    padding: 9px 16px; border-radius: 6px; cursor:pointer; font-size:13px;
+    transition: background .15s;
+  }
+  .btn:hover{ background: var(--rust-dark); }
+  .btn.ghost{
+    background: transparent; color: var(--forest); border:1px solid var(--forest);
+  }
+  .btn.ghost:hover{ background: var(--sand-deep); }
+  .btn.small{ padding: 5px 10px; font-size: 12px; }
+  .btn.danger{ background: var(--danger); }
+  .btn.danger:hover{ background: #7E2F22; }
+
+  .row-actions{ text-align:center; width: 40px; }
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px; flex-wrap:wrap; gap:10px; }
+
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius: 8px; }
+  table{ min-width: 700px; }
+
+  /* Übersicht */
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 720px){ .grid2{ grid-template-columns: 1fr; } }
+  .field{ margin-bottom: 12px; }
+  .field label{ display:block; font-size:12px; color: var(--ink-soft); margin-bottom:4px; font-family:'Oswald',sans-serif; letter-spacing:0.3px; text-transform:uppercase; }
+  .field input, .field textarea{
+    width:100%; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:14px;
+  }
+  .field textarea{ resize: vertical; min-height: 50px; }
+
+  .persons-grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin: 10px 0 20px; }
+  @media (max-width: 720px){ .persons-grid{ grid-template-columns: 1fr 1fr; } }
+  .person-card{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#FAF7EF; }
+  .person-card label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.3px; }
+
+  .summary-box{
+    background: var(--sand-deep); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; margin-top: 16px; font-family:'Oswald',sans-serif;
+    display:flex; gap: 30px; flex-wrap:wrap;
+  }
+  .summary-box div .val{ font-size: 20px; font-weight:700; color: var(--forest); }
+  .summary-box div .lbl{ font-size:11px; color: var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px; }
+
+  input[type="checkbox"]{ width:18px; height:18px; accent-color: var(--rust); }
+
+  footer{
+    max-width:1100px; margin: 0 auto; padding: 16px 24px 40px;
+    color: var(--ink-soft); font-size:12px; text-align:center;
+  }
+
+  /* ---------- Login-Screen ---------- */
+  #loginOverlay{
+    position: fixed; inset: 0; z-index: 1000;
+    background: linear-gradient(180deg, var(--forest) 0%, var(--forest-dark) 100%);
+    display:flex; align-items:center; justify-content:center;
+    padding: 24px;
+  }
+  #loginOverlay svg.topo{
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0.12; pointer-events:none;
+  }
+  .login-card{
+    position:relative; z-index:1;
+    background: var(--white);
+    border-radius: 10px;
+    padding: 34px 32px 28px;
+    width: 100%; max-width: 360px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    text-align: center;
+  }
+  .login-card .eyebrow{ color: var(--rust); }
+  .login-card h1{ color: var(--forest); font-size: 24px; margin-bottom: 4px; }
+  .login-card p.sub{ color: var(--ink-soft); margin: 0 0 22px; font-size: 13px; }
+  .login-card input[type="password"]{
+    width:100%; border:1px solid var(--line); border-radius:6px;
+    padding: 11px 12px; font-size: 15px; text-align:center;
+    letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .login-card input[type="password"]:focus{ outline:none; border-color: var(--gold); }
+  .login-card .btn{ width:100%; padding: 11px; font-size:14px; }
+  .login-card .error{
+    color: var(--danger); font-size: 12.5px; margin: 10px 0 0; min-height: 16px;
+  }
+  #appRoot{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <svg class="topo" viewBox="0 0 1000 200" preserveAspectRatio="none">
+    <path d="M0,150 Q100,100 200,150 T400,150 T600,150 T800,150 T1000,150" fill="none" stroke="#C9A15E" stroke-width="1.5"/>
+    <path d="M0,120 Q100,70 200,120 T400,120 T600,120 T800,120 T1000,120" fill="none" stroke="#C9A15E" stroke-width="1"/>
+  </svg>
+  <div class="login-card">
+    <p class="eyebrow">Privater Bereich</p>
+    <h1>USA Roadtrip</h1>
+    <p class="sub">Nur für die Reisegruppe — bitte Passwort eingeben.</p>
+    <form id="loginForm">
+      <input type="password" id="loginPassword" placeholder="Passwort" autocomplete="current-password" required>
+      <button type="submit" class="btn">Anmelden</button>
+      <p class="error" id="loginError"></p>
+    </form>
+  </div>
+</div>
+
+<div id="appRoot">
+
+<div class="hero">
+  <svg class="topo" viewBox="0 0 1000 200" preserveAspectRatio="none">
+    <path d="M0,150 Q100,100 200,150 T400,150 T600,150 T800,150 T1000,150" fill="none" stroke="#C9A15E" stroke-width="1.5"/>
+    <path d="M0,170 Q100,120 200,170 T400,170 T600,170 T800,170 T1000,170" fill="none" stroke="#C9A15E" stroke-width="1.5"/>
+    <path d="M0,120 Q100,70 200,120 T400,120 T600,120 T800,120 T1000,120" fill="none" stroke="#C9A15E" stroke-width="1"/>
+    <path d="M0,190 Q100,150 200,190 T400,190 T600,190 T800,190 T1000,190" fill="none" stroke="#C9A15E" stroke-width="1"/>
+  </svg>
+  <div class="hero-inner">
+    <p class="eyebrow">Zion · Yosemite · Sequoia &amp; mehr</p>
+    <h1>USA Roadtrip Planer</h1>
+    <p class="sub">Gemeinsame Planung für 4 Reisende — Änderungen werden live synchronisiert.</p>
+    <div id="syncStatus"><span class="dot"></span><span id="syncText">Verbindung wird hergestellt…</span></div>
+  </div>
+</div>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="uebersicht" class="active"><span class="marker">◆</span>Übersicht</button>
+  <button data-tab="tagesplan"><span class="marker">◆</span>Tagesplan</button>
+  <button data-tab="unternehmungen"><span class="marker">◆</span>Unternehmungen</button>
+  <button data-tab="restaurants"><span class="marker">◆</span>Restaurants</button>
+  <button data-tab="budget"><span class="marker">◆</span>Budget</button>
+  <button data-tab="packliste"><span class="marker">◆</span>Packliste</button>
+</nav>
+
+<main>
+
+  <!-- ÜBERSICHT -->
+  <section class="panel active" id="panel-uebersicht">
+    <h2>Übersicht</h2>
+    <p class="hint">Eckdaten der Reise. Alle Felder werden automatisch gespeichert.</p>
+    <div class="grid2">
+      <div class="field"><label>Start der Reise</label><input type="date" id="ov-start"></div>
+      <div class="field"><label>Ende der Reise</label><input type="date" id="ov-ende"></div>
+    </div>
+    <div class="field"><label>Notizen zur Übersicht (Flüge, Mietwagen, Versicherung…)</label>
+      <textarea id="ov-notizen" placeholder="z.B. Flugnummern, Mietwagenstation, ESTA-Status…"></textarea>
+    </div>
+
+    <h2 style="margin-top:28px;">Mitreisende</h2>
+    <div class="persons-grid" id="personsGrid"></div>
+  </section>
+
+  <!-- TAGESPLAN -->
+  <section class="panel" id="panel-tagesplan">
+    <h2>Tagesplan</h2>
+    <p class="hint">18 Reisetage — Zellen anklicken und direkt eintippen.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:40px;">Tag</th><th style="width:110px;">Datum</th><th>Ort / Stadt</th>
+          <th>Vormittag</th><th>Nachmittag</th><th>Abend</th><th>Übernachtung</th><th>Transport</th>
+        </tr></thead>
+        <tbody id="tagesplanBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- UNTERNEHMUNGEN -->
+  <section class="panel" id="panel-unternehmungen">
+    <h2>Unternehmungen &amp; Aktivitäten</h2>
+    <p class="hint">Alles was ihr unternehmen wollt — inkl. Kosten, Priorität und Status.</p>
+    <div class="toolbar"><button class="btn" onclick="addRow('activities')">+ Aktivität hinzufügen</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Ort</th><th>Aktivität</th><th style="width:130px;">Kategorie</th>
+          <th style="width:100px;">Kosten p.P. ($)</th><th style="width:110px;">Priorität</th>
+          <th>Notizen</th><th style="width:90px;">Erledigt?</th><th class="row-actions"></th>
+        </tr></thead>
+        <tbody id="activitiesBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RESTAURANTS -->
+  <section class="panel" id="panel-restaurants">
+    <h2>Restaurants &amp; Essensspots</h2>
+    <p class="hint">Empfehlungen und Reservierungsstatus sammeln.</p>
+    <div class="toolbar"><button class="btn" onclick="addRow('restaurants')">+ Restaurant hinzufügen</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Ort</th><th>Name</th><th style="width:120px;">Küche/Typ</th>
+          <th style="width:90px;">Preis</th><th>Notizen / Empfehlung von</th>
+          <th style="width:110px;">Reserviert?</th><th class="row-actions"></th>
+        </tr></thead>
+        <tbody id="restaurantsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BUDGET -->
+  <section class="panel" id="panel-budget">
+    <h2>Budget &amp; Kostenaufteilung</h2>
+    <p class="hint">Jede Ausgabe wird automatisch durch 4 geteilt.</p>
+    <div class="toolbar"><button class="btn" onclick="addRow('expenses')">+ Ausgabe hinzufügen</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Posten</th><th style="width:130px;">Kategorie</th><th style="width:110px;">Betrag ($)</th>
+          <th style="width:130px;">Bezahlt von</th><th style="width:90px;">p.P. ($)</th><th class="row-actions"></th>
+        </tr></thead>
+        <tbody id="expensesBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-box" id="budgetSummary"></div>
+  </section>
+
+  <!-- PACKLISTE -->
+  <section class="panel" id="panel-packliste">
+    <h2>Packliste</h2>
+    <p class="hint">Gemeinsame Checkliste — jeder kann abhaken.</p>
+    <div class="toolbar"><button class="btn" onclick="addRow('packing')">+ Artikel hinzufügen</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:160px;">Kategorie</th><th>Artikel</th><th style="width:90px;">Gepackt?</th><th>Notizen</th><th class="row-actions"></th>
+        </tr></thead>
+        <tbody id="packingBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer>USA Roadtrip Planer · gemeinsam bearbeitbar · Daten liegen in Firebase Firestore</footer>
+
+</div><!-- /#appRoot -->
+
+<script>
+/* =========================================================================
+   FIREBASE SETUP
+   -------------------------------------------------------------------------
+   1. Gehe zu https://console.firebase.google.com und erstelle ein (kostenloses)
+      Projekt.
+   2. Klicke auf "Web-App hinzufügen" (</> Icon) und kopiere das config-Objekt.
+   3. Ersetze das Objekt unten (firebaseConfig) mit deinem eigenen.
+   4. Aktiviere im Firebase-Konsolenmenü unter "Firestore Database" eine
+      Datenbank (Modus "Testmodus" reicht zum Start).
+   5. LOGIN EINRICHTEN:
+      a) Firebase-Konsole -> "Authentication" -> "Sign-in method" ->
+         "E-Mail/Passwort" aktivieren.
+      b) Reiter "Users" -> "Nutzer hinzufuegen" -> z.B.
+         E-Mail: gruppe@usa-trip.local   Passwort: euer-gemeinsames-passwort
+         (die E-Mail muss keine echte Adresse sein, sie dient nur als Login-ID)
+      c) Trage dieselbe E-Mail unten bei SHARED_LOGIN_EMAIL ein.
+   6. WICHTIG fuer echte Sicherheit: Setze in der Firebase-Konsole unter
+      "Firestore Database" -> "Regeln" folgendes, damit nur angemeldete
+      Nutzer lesen/schreiben koennen:
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /usaTrip/{doc} {
+              allow read, write: if request.auth != null;
+            }
+          }
+        }
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAfgkYOpTIpSJ0g_mPwTbYo5it7jPEwzl8",
+  authDomain: "usa2026-9b845.firebaseapp.com",
+  projectId: "usa2026-9b845",
+  storageBucket: "usa2026-9b845.firebasestorage.app",
+  messagingSenderId: "921956314205",
+  appId: "1:921956314205:web:6f1aa34b7808232478f1b4"
+};
+
+// Die E-Mail-Adresse des gemeinsamen Gruppen-Logins (siehe Schritt 5b oben)
+const SHARED_LOGIN_EMAIL = "gruppe@usa-trip.local";
+
+let db = null;
+let auth = null;
+let docRef = null;
+let firebaseReady = false;
+
+const DEFAULT_STATE = {
+  overview: { start: "", ende: "", notizen: "" },
+  persons: ["Person 1", "Person 2", "Person 3", "Person 4"],
+  days: Array.from({length: 18}, (_, i) => ({
+    tag: i + 1, datum: "", ort: "", vormittag: "", nachmittag: "", abend: "", uebernachtung: "", transport: ""
+  })),
+  activities: [],
+  restaurants: [],
+  expenses: [],
+  packing: [
+    {kat:"Dokumente", item:"Reisepass", done:false, notiz:""},
+    {kat:"Dokumente", item:"ESTA-Bestätigung (Ausdruck)", done:false, notiz:""},
+    {kat:"Dokumente", item:"Flugtickets", done:false, notiz:""},
+    {kat:"Finanzen", item:"America the Beautiful Pass", done:false, notiz:""},
+    {kat:"Elektronik", item:"Steckdosenadapter USA", done:false, notiz:""}
+  ]
+};
+
+let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+let saveTimeout = null;
+
+function setSyncStatus(mode, text){
+  const el = document.getElementById('syncStatus');
+  const txt = document.getElementById('syncText');
+  el.className = mode;
+  txt.textContent = text;
+}
+
+function showApp(){
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+}
+function showLogin(message){
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  if(message) document.getElementById('loginError').textContent = message;
+}
+
+function connectFirestore(){
+  docRef = db.collection('usaTrip').doc('sharedData');
+  docRef.onSnapshot((snap) => {
+    if(snap.exists){
+      state = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), snap.data());
+      ['days','activities','restaurants','expenses','packing'].forEach(k=>{
+        if(!Array.isArray(state[k])) state[k] = DEFAULT_STATE[k];
+      });
+      renderAll();
+      setSyncStatus('', 'Live verbunden — Änderungen werden für alle synchronisiert.');
+    } else {
+      docRef.set(state).then(()=> setSyncStatus('', 'Neues Dokument angelegt — live verbunden.'));
+    }
+    firebaseReady = true;
+  }, (err) => {
+    console.error(err);
+    setSyncStatus('error', 'Verbindung fehlgeschlagen: ' + err.message);
+  });
+}
+
+function initFirebase(){
+  try{
+    if(firebaseConfig.apiKey === "DEIN_API_KEY"){
+      // Firebase noch nicht konfiguriert: Login überspringen, nur lokaler Testmodus
+      showApp();
+      setSyncStatus('error', 'Firebase noch nicht konfiguriert — Daten werden nur lokal in diesem Browser gehalten (kein Login aktiv).');
+      renderAll();
+      return;
+    }
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+
+    auth.onAuthStateChanged((user) => {
+      if(user){
+        showApp();
+        connectFirestore();
+      } else {
+        showLogin();
+      }
+    });
+  } catch(e){
+    console.error(e);
+    showApp();
+    setSyncStatus('error', 'Firebase-Fehler — Daten werden nur lokal gehalten.');
+    renderAll();
+  }
+}
+
+document.getElementById('loginForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const pw = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!auth){
+    errEl.textContent = 'Login nicht verfügbar.';
+    return;
+  }
+  auth.signInWithEmailAndPassword(SHARED_LOGIN_EMAIL, pw)
+    .catch((err) => {
+      console.error(err);
+      errEl.textContent = 'Falsches Passwort oder Login nicht eingerichtet.';
+    });
+});
+
+function scheduleSave(){
+  if(!firebaseReady || !docRef) return;
+  setSyncStatus('saving', 'Speichere…');
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    docRef.set(state).then(() => {
+      setSyncStatus('', 'Live verbunden — Änderungen werden für alle synchronisiert.');
+    }).catch(err => {
+      setSyncStatus('error', 'Speichern fehlgeschlagen: ' + err.message);
+    });
+  }, 500);
+}
+
+/* ---------------- Tabs ---------------- */
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('section.panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+});
+
+/* ---------------- Render: Übersicht ---------------- */
+function renderOverview(){
+  document.getElementById('ov-start').value = state.overview.start || "";
+  document.getElementById('ov-ende').value = state.overview.ende || "";
+  document.getElementById('ov-notizen').value = state.overview.notizen || "";
+
+  const grid = document.getElementById('personsGrid');
+  grid.innerHTML = "";
+  state.persons.forEach((name, idx) => {
+    const card = document.createElement('div');
+    card.className = 'person-card';
+    card.innerHTML = `<label>Person ${idx+1}</label><input type="text" value="${escapeAttr(name)}" data-idx="${idx}" class="person-input">`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.person-input').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      state.persons[e.target.dataset.idx] = e.target.value;
+      scheduleSave();
+      renderBudget();
+    });
+  });
+}
+
+document.getElementById('ov-start').addEventListener('input', e => { state.overview.start = e.target.value; scheduleSave(); });
+document.getElementById('ov-ende').addEventListener('input', e => { state.overview.ende = e.target.value; scheduleSave(); });
+document.getElementById('ov-notizen').addEventListener('input', e => { state.overview.notizen = e.target.value; scheduleSave(); });
+
+/* ---------------- Render: Tagesplan ---------------- */
+const dayFields = ['datum','ort','vormittag','nachmittag','abend','uebernachtung','transport'];
+function renderDays(){
+  const body = document.getElementById('tagesplanBody');
+  body.innerHTML = "";
+  state.days.forEach((day, idx) => {
+    const tr = document.createElement('tr');
+    let cells = `<td class="daynum">${day.tag}</td>`;
+    dayFields.forEach(f => {
+      const type = f === 'datum' ? 'date' : 'text';
+      cells += `<td><input type="${type}" value="${escapeAttr(day[f]||'')}" data-idx="${idx}" data-field="${f}" class="day-input"></td>`;
+    });
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.day-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      state.days[e.target.dataset.idx][e.target.dataset.field] = e.target.value;
+      scheduleSave();
+    });
+  });
+}
+
+/* ---------------- Generic list renderer (activities/restaurants/expenses/packing) ---------------- */
+function addRow(key){
+  const templates = {
+    activities: {ort:"", aktivitaet:"", kategorie:"Sightseeing", kosten:"", prioritaet:"Nice-to-have", notiz:"", done:false},
+    restaurants: {ort:"", name:"", kueche:"", preis:"$$", notiz:"", reserviert:"Nein"},
+    expenses: {posten:"", kategorie:"Sonstiges", betrag:"", bezahltVon:"Gemeinsame Kasse"},
+    packing: {kat:"", item:"", done:false, notiz:""}
+  };
+  state[key].push(JSON.parse(JSON.stringify(templates[key])));
+  scheduleSave();
+  renderAll();
+}
+function removeRow(key, idx){
+  state[key].splice(idx, 1);
+  scheduleSave();
+  renderAll();
+}
+
+function renderActivities(){
+  const body = document.getElementById('activitiesBody');
+  body.innerHTML = "";
+  const cats = ["Sightseeing","Natur/Outdoor","Museum","Nightlife","Shopping","Abenteuer/Sport","Sonstiges"];
+  const prios = ["Muss","Nice-to-have","Optional"];
+  state.activities.forEach((a, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(a.ort)}" data-idx="${idx}" data-field="ort" class="act-input"></td>
+      <td><input type="text" value="${escapeAttr(a.aktivitaet)}" data-idx="${idx}" data-field="aktivitaet" class="act-input"></td>
+      <td>${selectHtml(cats, a.kategorie, idx, 'kategorie', 'act-select')}</td>
+      <td><input type="number" value="${escapeAttr(a.kosten)}" data-idx="${idx}" data-field="kosten" class="act-input"></td>
+      <td>${selectHtml(prios, a.prioritaet, idx, 'prioritaet', 'act-select')}</td>
+      <td><input type="text" value="${escapeAttr(a.notiz)}" data-idx="${idx}" data-field="notiz" class="act-input"></td>
+      <td style="text-align:center;"><input type="checkbox" ${a.done?'checked':''} data-idx="${idx}" class="act-done"></td>
+      <td class="row-actions"><button class="btn small danger" onclick="removeRow('activities',${idx})">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.act-input').forEach(inp => inp.addEventListener('input', e => {
+    state.activities[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave();
+  }));
+  body.querySelectorAll('.act-select').forEach(sel => sel.addEventListener('change', e => {
+    state.activities[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave();
+  }));
+  body.querySelectorAll('.act-done').forEach(cb => cb.addEventListener('change', e => {
+    state.activities[e.target.dataset.idx].done = e.target.checked; scheduleSave();
+  }));
+}
+
+function renderRestaurants(){
+  const body = document.getElementById('restaurantsBody');
+  body.innerHTML = "";
+  const prices = ["$","$$","$$$","$$$$"];
+  const res = ["Ja","Nein","Nicht nötig"];
+  state.restaurants.forEach((r, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(r.ort)}" data-idx="${idx}" data-field="ort" class="res-input"></td>
+      <td><input type="text" value="${escapeAttr(r.name)}" data-idx="${idx}" data-field="name" class="res-input"></td>
+      <td><input type="text" value="${escapeAttr(r.kueche)}" data-idx="${idx}" data-field="kueche" class="res-input"></td>
+      <td>${selectHtml(prices, r.preis, idx, 'preis', 'res-select')}</td>
+      <td><input type="text" value="${escapeAttr(r.notiz)}" data-idx="${idx}" data-field="notiz" class="res-input"></td>
+      <td>${selectHtml(res, r.reserviert, idx, 'reserviert', 'res-select')}</td>
+      <td class="row-actions"><button class="btn small danger" onclick="removeRow('restaurants',${idx})">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.res-input').forEach(inp => inp.addEventListener('input', e => {
+    state.restaurants[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave();
+  }));
+  body.querySelectorAll('.res-select').forEach(sel => sel.addEventListener('change', e => {
+    state.restaurants[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave();
+  }));
+}
+
+function renderExpenses(){
+  const body = document.getElementById('expensesBody');
+  body.innerHTML = "";
+  const cats = ["Flug","Unterkunft","Mietwagen","Sprit","Verpflegung","Aktivität","Maut/Parken","Versicherung","Sonstiges"];
+  const paidByOptions = () => [...state.persons, "Gemeinsame Kasse"];
+  state.expenses.forEach((ex, idx) => {
+    const betrag = parseFloat(ex.betrag) || 0;
+    const proPerson = (betrag / 4).toFixed(2);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(ex.posten)}" data-idx="${idx}" data-field="posten" class="exp-input"></td>
+      <td>${selectHtml(cats, ex.kategorie, idx, 'kategorie', 'exp-select')}</td>
+      <td><input type="number" value="${escapeAttr(ex.betrag)}" data-idx="${idx}" data-field="betrag" class="exp-input"></td>
+      <td>${selectHtml(paidByOptions(), ex.bezahltVon, idx, 'bezahltVon', 'exp-select')}</td>
+      <td style="text-align:right;">$${proPerson}</td>
+      <td class="row-actions"><button class="btn small danger" onclick="removeRow('expenses',${idx})">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.exp-input').forEach(inp => inp.addEventListener('input', e => {
+    state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
+  }));
+  body.querySelectorAll('.exp-select').forEach(sel => sel.addEventListener('change', e => {
+    state.expenses[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave(); renderExpenses();
+  }));
+  renderBudget();
+}
+
+function renderBudget(){
+  const total = state.expenses.reduce((s,e) => s + (parseFloat(e.betrag)||0), 0);
+  const perPerson = total / 4;
+  const box = document.getElementById('budgetSummary');
+  let html = `
+    <div><div class="val">$${total.toFixed(2)}</div><div class="lbl">Gesamtausgaben</div></div>
+    <div><div class="val">$${perPerson.toFixed(2)}</div><div class="lbl">Soll-Anteil p.P.</div></div>`;
+  state.persons.forEach(name => {
+    const paid = state.expenses.filter(e => e.bezahltVon === name).reduce((s,e)=>s+(parseFloat(e.betrag)||0),0);
+    const diff = paid - perPerson;
+    const sign = diff >= 0 ? '+' : '';
+    html += `<div><div class="val" style="color:${diff>=0?'#2F4538':'#A6402F'}">${sign}$${diff.toFixed(2)}</div><div class="lbl">${escapeHtml(name)}</div></div>`;
+  });
+  box.innerHTML = html;
+}
+
+function renderPacking(){
+  const body = document.getElementById('packingBody');
+  body.innerHTML = "";
+  state.packing.forEach((p, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(p.kat)}" data-idx="${idx}" data-field="kat" class="pack-input"></td>
+      <td><input type="text" value="${escapeAttr(p.item)}" data-idx="${idx}" data-field="item" class="pack-input"></td>
+      <td style="text-align:center;"><input type="checkbox" ${p.done?'checked':''} data-idx="${idx}" class="pack-done"></td>
+      <td><input type="text" value="${escapeAttr(p.notiz)}" data-idx="${idx}" data-field="notiz" class="pack-input"></td>
+      <td class="row-actions"><button class="btn small danger" onclick="removeRow('packing',${idx})">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.pack-input').forEach(inp => inp.addEventListener('input', e => {
+    state.packing[e.target.dataset.idx][e.target.dataset.field] = e.target.value; scheduleSave();
+  }));
+  body.querySelectorAll('.pack-done').forEach(cb => cb.addEventListener('change', e => {
+    state.packing[e.target.dataset.idx].done = e.target.checked; scheduleSave();
+  }));
+}
+
+/* ---------------- Helpers ---------------- */
+function selectHtml(options, current, idx, field, cls){
+  return `<select data-idx="${idx}" data-field="${field}" class="${cls}">` +
+    options.map(o => `<option value="${escapeAttr(o)}" ${o===current?'selected':''}>${escapeHtml(o)}</option>`).join('') +
+    `</select>`;
+}
+function escapeAttr(str){ return String(str??"").replace(/"/g,'&quot;'); }
+function escapeHtml(str){ return String(str??"").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderAll(){
+  renderOverview();
+  renderDays();
+  renderActivities();
+  renderRestaurants();
+  renderExpenses();
+  renderPacking();
+}
+
+initFirebase();
+</script>
+</body>
+</html>
